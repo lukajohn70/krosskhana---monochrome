@@ -32,22 +32,49 @@ function initNavigation() {
             const isOpen = mobileMenu.classList.contains('max-h-96');
             
             if (isOpen) {
-                mobileMenu.classList.remove('max-h-96', 'opacity-100');
-                mobileMenu.classList.add('max-h-0', 'opacity-0', 'overflow-hidden');
+                closeMobileMenu();
             } else {
-                mobileMenu.classList.remove('max-h-0', 'opacity-0', 'overflow-hidden');
-                mobileMenu.classList.add('max-h-96', 'opacity-100');
-            }
-
-            // Animate hamburger menu
-            if (mobileMenuSpans.length >= 3) {
-                mobileMenuSpans[0].classList.toggle('rotate-45', !isOpen);
-                mobileMenuSpans[0].classList.toggle('translate-y-1', !isOpen);
-                mobileMenuSpans[1].classList.toggle('opacity-0', !isOpen);
-                mobileMenuSpans[2].classList.toggle('-rotate-45', !isOpen);
-                mobileMenuSpans[2].classList.toggle('-translate-y-1', !isOpen);
+                openMobileMenu();
             }
         });
+    }
+}
+
+// Close mobile menu function
+function closeMobileMenu() {
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenuSpans = mobileMenuBtn?.querySelectorAll('span');
+    
+    if (mobileMenu && mobileMenuBtn) {
+        mobileMenu.classList.remove('max-h-96', 'opacity-100');
+        mobileMenu.classList.add('max-h-0', 'opacity-0', 'overflow-hidden');
+        
+        // Reset hamburger menu animation
+        if (mobileMenuSpans && mobileMenuSpans.length >= 3) {
+            mobileMenuSpans[0].classList.remove('rotate-45', 'translate-y-1');
+            mobileMenuSpans[1].classList.remove('opacity-0');
+            mobileMenuSpans[2].classList.remove('-rotate-45', '-translate-y-1');
+        }
+    }
+}
+
+// Open mobile menu function
+function openMobileMenu() {
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenuSpans = mobileMenuBtn?.querySelectorAll('span');
+    
+    if (mobileMenu && mobileMenuBtn) {
+        mobileMenu.classList.remove('max-h-0', 'opacity-0', 'overflow-hidden');
+        mobileMenu.classList.add('max-h-96', 'opacity-100');
+        
+        // Animate hamburger menu
+        if (mobileMenuSpans && mobileMenuSpans.length >= 3) {
+            mobileMenuSpans[0].classList.add('rotate-45', 'translate-y-1');
+            mobileMenuSpans[1].classList.add('opacity-0');
+            mobileMenuSpans[2].classList.add('-rotate-45', '-translate-y-1');
+        }
     }
 }
 
@@ -181,14 +208,49 @@ function showNotification(message, success, context) {
 
 // Smooth scroll to section
 function scrollToSection(sectionId) {
+    console.log('scrollToSection called with:', sectionId);
+    
     const element = document.getElementById(sectionId);
+    console.log('Element found:', element);
+    
     if (element) {
-        element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+        console.log('Scrolling to element:', element);
+        
+        // Get navbar height first
+        const navbar = document.querySelector('nav');
+        const navbarHeight = navbar ? navbar.offsetHeight : 80;
+        console.log('Navbar height:', navbarHeight);
+        
+        // Check if we're on mobile
+        const isMobile = window.innerWidth <= 768;
+        
+        // Calculate target position
+        const elementTop = element.offsetTop;
+        let targetPosition;
+        
+        if (isMobile) {
+            // For mobile, adjust the offset to reduce space between navbar and content
+            targetPosition = elementTop - navbarHeight + 400; // Add 320px to bring content closer
+        } else {
+            // For desktop, keep the original behavior unchanged
+            targetPosition = elementTop - navbarHeight - 20;
+        }
+        
+        console.log('Target position:', targetPosition, 'isMobile:', isMobile);
+        
+        // Scroll directly to the calculated position
+        window.scrollTo({
+            top: targetPosition,
+            behavior: 'smooth'
         });
+        
         // Update active navigation state
         updateActiveNavigation(sectionId);
+        
+        // Close mobile menu if it's open
+        closeMobileMenu();
+    } else {
+        console.error('Element not found for sectionId:', sectionId);
     }
 }
 
@@ -212,10 +274,13 @@ function updateActiveNavigation(activeSectionId) {
 // Handle scroll-based navigation highlighting
 function initScrollBasedNavigation() {
     const sections = ['home', 'about', 'mission', 'explore', 'events', 'team', 'highlights', 'participate', 'sponsors', 'news-brief'];
-    const navHeight = 80; // Approximate navigation height
     
     window.addEventListener('scroll', function() {
-        const scrollPosition = window.scrollY + navHeight + 100; // Add offset for better detection
+        // Get navbar height dynamically
+        const navbar = document.querySelector('nav');
+        const navbarHeight = navbar ? navbar.offsetHeight : 80;
+        
+        const scrollPosition = window.scrollY + navbarHeight + 100; // Add offset for better detection
         
         let currentSection = 'home';
         
@@ -337,7 +402,11 @@ function initScrollEffects() {
     const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
     
     function updateActiveSection() {
-        const scrollPosition = window.scrollY + 100;
+        // Get navbar height dynamically
+        const navbar = document.querySelector('nav');
+        const navbarHeight = navbar ? navbar.offsetHeight : 80;
+        
+        const scrollPosition = window.scrollY + navbarHeight + 100;
         
         for (let i = sections.length - 1; i >= 0; i--) {
             const section = document.getElementById(sections[i]);
