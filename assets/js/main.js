@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initEventTabs();
     initScrollBasedNavigation();
     initDropdownMenu();
+    initCarousel();
 });
 
 // Navigation functionality
@@ -107,17 +108,14 @@ async function handleNewsBriefSubmit(e) {
     }
 
     try {
-        const response = await fetch('api/subscribe.php', {
+        const response = await fetch('process-newsletter.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ name: name, email: email })
+            body: formData
         });
 
         const data = await response.json();
         
-        if (response.ok) {
+        if (data.status === 'success') {
             showNotification(data.message, true, 'news');
             e.target.reset();
         } else {
@@ -133,37 +131,67 @@ async function handleContactSubmit(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    const data = {
-        name: formData.get('name'),
-        email: formData.get('email'),
-        category: formData.get('category'),
-        message: formData.get('message')
-    };
     
-    if (!data.name || !data.email || !data.category || !data.message) {
-        showNotification('Please fill in all fields.', false, 'contact');
+    // Validate required fields
+    const name = formData.get('name');
+    const email = formData.get('email');
+    const subject = formData.get('subject');
+    const message = formData.get('message');
+    
+    if (!name || !email || !subject || !message) {
+        showNotification('Please fill in all required fields.', false, 'contact');
         return;
     }
 
     try {
-        const response = await fetch('api/contact.php', {
+        const response = await fetch('process-contact.php', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data)
+            body: formData
         });
 
-        const result = await response.json();
+        const data = await response.json();
         
-        if (response.ok) {
-            showNotification(result.message, true, 'contact');
+        if (data.status === 'success') {
+            showNotification(data.message, true, 'contact');
             e.target.reset();
         } else {
-            showNotification(result.message, false, 'contact');
+            showNotification(data.message, false, 'contact');
         }
     } catch (error) {
         showNotification('Failed to send message. Please try again.', false, 'contact');
+    }
+}
+
+// Tab switching function
+function switchTab(tabName) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        content.classList.add('hidden');
+        content.classList.remove('active');
+    });
+    
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        button.classList.remove('active');
+        button.classList.remove('bg-white/20');
+        button.classList.add('text-gray-300');
+    });
+    
+    // Show selected tab content
+    const selectedContent = document.getElementById(tabName + '-content');
+    if (selectedContent) {
+        selectedContent.classList.remove('hidden');
+        selectedContent.classList.add('active');
+    }
+    
+    // Add active class to selected tab button
+    const selectedButton = document.getElementById(tabName + '-tab');
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+        selectedButton.classList.add('bg-white/20');
+        selectedButton.classList.remove('text-gray-300');
     }
 }
 
@@ -179,16 +207,16 @@ function showNotification(message, success, context) {
         let iconClass, gradientClass;
         
         if (context === 'contact') {
-            iconClass = success ? 'fas fa-check-circle text-blue-500' : 'fas fa-exclamation-circle text-purple-500';
-            gradientClass = success ? 'from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600' : 'from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600';
+            iconClass = success ? 'fas fa-check-circle text-white' : 'fas fa-exclamation-circle text-gray-300';
+            gradientClass = success ? 'from-white to-gray-300 hover:from-gray-100 hover:to-gray-400' : 'from-gray-300 to-white hover:from-gray-400 hover:to-gray-100';
         } else {
-            iconClass = success ? 'fas fa-check-circle text-green-500' : 'fas fa-exclamation-circle text-red-500';
-            gradientClass = success ? 'from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600' : 'from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600';
+            iconClass = success ? 'fas fa-check-circle text-white' : 'fas fa-exclamation-circle text-gray-300';
+            gradientClass = success ? 'from-white to-gray-300 hover:from-gray-100 hover:to-gray-400' : 'from-gray-300 to-white hover:from-gray-400 hover:to-gray-100';
         }
 
         modalIcon.className = `mb-4 text-3xl ${iconClass}`;
         modalMessage.textContent = message;
-        modalClose.className = `px-6 py-2 bg-gradient-to-r ${gradientClass} text-white font-bold rounded-full shadow transition`;
+        modalClose.className = `px-6 py-2 bg-gradient-to-r ${gradientClass} text-black font-bold rounded-full shadow transition`;
         
         modal.classList.remove('hidden');
         
@@ -259,7 +287,7 @@ function updateActiveNavigation(activeSectionId) {
     // Remove active class from all navigation links
     const allNavLinks = document.querySelectorAll('.nav-link, .mobile-nav-link');
     allNavLinks.forEach(link => {
-        link.classList.remove('bg-gradient-to-r', 'from-red-500', 'to-orange-500', 'text-white', 'shadow-lg');
+        link.classList.remove('bg-gradient-to-r', 'from-white', 'to-gray-300', 'text-black', 'shadow-lg');
         link.classList.add('text-gray-300');
     });
     
@@ -267,13 +295,13 @@ function updateActiveNavigation(activeSectionId) {
     const activeNavLink = document.querySelector(`[onclick="scrollToSection('${activeSectionId}')"]`);
     if (activeNavLink) {
         activeNavLink.classList.remove('text-gray-300');
-        activeNavLink.classList.add('bg-gradient-to-r', 'from-red-500', 'to-orange-500', 'text-white', 'shadow-lg');
+        activeNavLink.classList.add('bg-gradient-to-r', 'from-white', 'to-gray-300', 'text-black', 'shadow-lg');
     }
 }
 
 // Handle scroll-based navigation highlighting
 function initScrollBasedNavigation() {
-    const sections = ['home', 'about', 'mission', 'explore', 'events', 'team', 'highlights', 'participate', 'sponsors', 'news-brief'];
+    const sections = ['home', 'about', 'mission', 'explore', 'events', 'team', 'highlights', 'participate', 'sponsors', 'news-brief', 'contact'];
     
     window.addEventListener('scroll', function() {
         // Get navbar height dynamically
@@ -418,12 +446,12 @@ function initScrollEffects() {
                     const targetId = link.getAttribute('onclick')?.match(/scrollToSection\('([^']+)'\)/)?.[1];
                     if (targetId === activeSection) {
                         link.classList.add('active');
-                        link.classList.add('text-red-400', 'bg-red-500/20', 'border', 'border-red-500/30');
-                        link.classList.remove('text-white/80', 'hover:text-white', 'hover:bg-white/10');
+                        link.classList.add('bg-gradient-to-r', 'from-white', 'to-gray-300', 'text-black', 'shadow-lg');
+                        link.classList.remove('text-gray-300');
                     } else {
                         link.classList.remove('active');
-                        link.classList.remove('text-red-400', 'bg-red-500/20', 'border', 'border-red-500/30');
-                        link.classList.add('text-white/80', 'hover:text-white', 'hover:bg-white/10');
+                        link.classList.remove('bg-gradient-to-r', 'from-white', 'to-gray-300', 'text-black', 'shadow-lg');
+                        link.classList.add('text-gray-300');
                     }
                 });
                 
@@ -432,12 +460,12 @@ function initScrollEffects() {
                     const targetId = link.getAttribute('onclick')?.match(/scrollToSection\('([^']+)'\)/)?.[1];
                     if (targetId === activeSection) {
                         link.classList.add('active');
-                        link.classList.add('text-red-400', 'bg-red-500/20', 'border', 'border-red-500/30');
-                        link.classList.remove('text-white/80', 'hover:text-white', 'hover:bg-white/10');
+                        link.classList.add('bg-gradient-to-r', 'from-white', 'to-gray-300', 'text-black', 'shadow-lg');
+                        link.classList.remove('text-gray-300');
                     } else {
                         link.classList.remove('active');
-                        link.classList.remove('text-red-400', 'bg-red-500/20', 'border', 'border-red-500/30');
-                        link.classList.add('text-white/80', 'hover:text-white', 'hover:bg-white/10');
+                        link.classList.remove('bg-gradient-to-r', 'from-white', 'to-gray-300', 'text-black', 'shadow-lg');
+                        link.classList.add('text-gray-300');
                     }
                 });
                 
@@ -484,7 +512,7 @@ function initEventTabs() {
         });
         
         // Set initial state - Past Events should be active by default
-        pastEventsTab.className = 'px-8 py-3 rounded-full text-white font-semibold transition-all duration-300 bg-gradient-to-r from-red-500 to-orange-500 shadow-lg';
+        pastEventsTab.className = 'px-8 py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg';
         upcomingEventsTab.className = 'px-8 py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10';
         pastEventsContent.style.display = 'block';
         upcomingEventsContent.style.display = 'none';
@@ -605,41 +633,33 @@ async function handleCorporateFormSubmit(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    const data = {
-        // Initial Selection
-        brand_collaboration: formData.get('brand_collaboration') === 'on',
-        vendor_opportunities: formData.get('vendor_opportunities') === 'on',
-        media_representative: formData.get('media_representative') === 'on',
-        
-        // Company/Contact Information
-        company: formData.get('company'),
-        contact_person: formData.get('contact_person'),
-        role_title: formData.get('role_title'),
-        email: formData.get('email'),
-        phone: formData.get('phone'),
-        website_social: formData.get('website_social'),
-        
-        // Primary Interest
-        event_integration: formData.get('event_integration') === 'on',
-        product_showcase: formData.get('product_showcase') === 'on',
-        brand_activation: formData.get('brand_activation') === 'on',
-        content_collaboration: formData.get('content_collaboration') === 'on',
-        rd_demonstration: formData.get('rd_demonstration') === 'on',
-        other_interest: formData.get('other_interest') === 'on',
-        other_interest_text: formData.get('other_interest_text')
-    };
     
     // Validate required fields
-    if (!data.company || !data.contact_person || !data.email || !data.phone) {
+    const company = formData.get('company');
+    const contactPerson = formData.get('contact_person');
+    const email = formData.get('email');
+    const phone = formData.get('phone');
+    
+    if (!company || !contactPerson || !email || !phone) {
         showNotification('Please fill in all required fields.', false, 'corporate');
         return;
     }
     
     try {
-        // For now, show success message (you can add actual API call here)
-        showNotification('Thank you! Your corporate partnership inquiry has been submitted successfully. We will contact you soon.', true, 'corporate');
-        e.target.reset();
-        closeCorporateForm();
+        const response = await fetch('process-corporate.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showNotification(data.message, true, 'corporate');
+            e.target.reset();
+            closeCorporateForm();
+        } else {
+            showNotification(data.message, false, 'corporate');
+        }
     } catch (error) {
         showNotification('Failed to submit form. Please try again.', false, 'corporate');
     }
@@ -649,47 +669,32 @@ async function handleRacerFormSubmit(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    const data = {
-        // Participation Type
-        autocross_competitor: formData.get('autocross_competitor') === 'on',
-        drifting_challenge: formData.get('drifting_challenge') === 'on',
-        exhibition_driver: formData.get('exhibition_driver') === 'on',
-        safety_training: formData.get('safety_training') === 'on',
-        
-        // Personal Contact Information
-        full_name: formData.get('full_name'),
-        racing_alias: formData.get('racing_alias'),
-        email: formData.get('email'),
-        phone: formData.get('phone'),
-        location: formData.get('location'),
-        
-        // Vehicle Details
-        make: formData.get('make'),
-        model: formData.get('model'),
-        year: formData.get('year'),
-        modifications: formData.get('modifications'),
-        
-        // Racing Experience
-        novice: formData.get('novice') === 'on',
-        intermediate: formData.get('intermediate') === 'on',
-        semi_pro: formData.get('semi_pro') === 'on',
-        professional: formData.get('professional') === 'on',
-        
-        // Previous Series
-        previous_series: formData.get('previous_series')
-    };
     
     // Validate required fields
-    if (!data.full_name || !data.email || !data.phone) {
+    const fullName = formData.get('full_name');
+    const email = formData.get('email');
+    const phone = formData.get('phone');
+    
+    if (!fullName || !email || !phone) {
         showNotification('Please fill in all required fields.', false, 'racer');
         return;
     }
     
     try {
-        // For now, show success message (you can add actual API call here)
-        showNotification('Thank you! Your racer registration has been submitted successfully. We will contact you soon.', true, 'racer');
-        e.target.reset();
-        closeRacerForm();
+        const response = await fetch('process-registration.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showNotification(data.message, true, 'racer');
+            e.target.reset();
+            closeRacerForm();
+        } else {
+            showNotification(data.message, false, 'racer');
+        }
     } catch (error) {
         showNotification('Failed to submit form. Please try again.', false, 'racer');
     }
@@ -699,54 +704,33 @@ async function handleSponsorshipFormSubmit(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    const data = {
-        // Sponsorship Type Selection
-        title_sponsorship: formData.get('title_sponsorship') === 'on',
-        event_series_sponsor: formData.get('event_series_sponsor') === 'on',
-        innovation_partner: formData.get('innovation_partner') === 'on',
-        community_platform_sponsor: formData.get('community_platform_sponsor') === 'on',
-        safety_initiative_partner: formData.get('safety_initiative_partner') === 'on',
-        
-        // Contact Information
-        organization: formData.get('organization'),
-        contact_person: formData.get('contact_person'),
-        title: formData.get('title'),
-        email: formData.get('email'),
-        phone: formData.get('phone'),
-        website: formData.get('website'),
-        
-        // Previous Motorsport Sponsorship Experience
-        none_experience: formData.get('none_experience') === 'on',
-        local_experience: formData.get('local_experience') === 'on',
-        national_experience: formData.get('national_experience') === 'on',
-        international_experience: formData.get('international_experience') === 'on',
-        
-        // Target Activation Type
-        track_branding: formData.get('track_branding') === 'on',
-        digital_integration: formData.get('digital_integration') === 'on',
-        vip_experiences: formData.get('vip_experiences') === 'on',
-        product_placement: formData.get('product_placement') === 'on',
-        tech_showcase: formData.get('tech_showcase') === 'on',
-        safety_campaign: formData.get('safety_campaign') === 'on',
-        
-        // Investment Range
-        investment_5k_15k: formData.get('investment_5k_15k') === 'on',
-        investment_15k_50k: formData.get('investment_15k_50k') === 'on',
-        investment_50k_100k: formData.get('investment_50k_100k') === 'on',
-        investment_100k_plus: formData.get('investment_100k_plus') === 'on'
-    };
     
     // Validate required fields
-    if (!data.organization || !data.contact_person || !data.email || !data.phone) {
+    const organization = formData.get('organization');
+    const contactPerson = formData.get('contact_person');
+    const email = formData.get('email');
+    const phone = formData.get('phone');
+    
+    if (!organization || !contactPerson || !email || !phone) {
         showNotification('Please fill in all required fields.', false, 'sponsorship');
         return;
     }
     
     try {
-        // For now, show success message (you can add actual API call here)
-        showNotification('Thank you! Your sponsorship inquiry has been submitted successfully. We will contact you soon.', true, 'sponsorship');
-        e.target.reset();
-        closeSponsorshipForm();
+        const response = await fetch('process-sponsorship.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showNotification(data.message, true, 'sponsorship');
+            e.target.reset();
+            closeSponsorshipForm();
+        } else {
+            showNotification(data.message, false, 'sponsorship');
+        }
     } catch (error) {
         showNotification('Failed to submit form. Please try again.', false, 'sponsorship');
     }
@@ -861,7 +845,7 @@ window.switchToPastEvents = function() {
     
     if (pastEventsTab && upcomingEventsTab && pastEventsContent && upcomingEventsContent) {
         // Update tab styles
-        pastEventsTab.className = 'px-8 py-3 rounded-full text-white font-semibold transition-all duration-300 bg-gradient-to-r from-red-500 to-orange-500 shadow-lg';
+        pastEventsTab.className = 'px-8 py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg';
         upcomingEventsTab.className = 'px-8 py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10';
         
         // Show/hide content
@@ -887,7 +871,7 @@ window.switchToUpcomingEvents = function() {
     
     if (pastEventsTab && upcomingEventsTab && pastEventsContent && upcomingEventsContent) {
         // Update tab styles
-        upcomingEventsTab.className = 'px-8 py-3 rounded-full text-white font-semibold transition-all duration-300 bg-gradient-to-r from-red-500 to-orange-500 shadow-lg';
+        upcomingEventsTab.className = 'px-8 py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg';
         pastEventsTab.className = 'px-8 py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10';
         
         // Show/hide content
@@ -957,3 +941,105 @@ function throttle(func, limit) {
 // Export functions for global access
 window.scrollToSection = scrollToSection;
 window.showNotification = showNotification;
+
+// Carousel functionality
+function initCarousel() {
+    const carouselTrack = document.getElementById('carousel-track');
+    const prevBtn = document.getElementById('carousel-prev');
+    const nextBtn = document.getElementById('carousel-next');
+    const indicators = document.querySelectorAll('.carousel-indicator');
+    
+    if (!carouselTrack || !prevBtn || !nextBtn) {
+        console.log('Carousel elements not found, skipping carousel initialization');
+        return;
+    }
+    
+    let currentSlide = 0;
+    const totalSlides = 2; // We have 2 slides with 3 cards each
+    
+    function updateCarousel() {
+        const translateX = -currentSlide * 100;
+        carouselTrack.style.transform = `translateX(${translateX}%)`;
+        
+        // Update indicators
+        indicators.forEach((indicator, index) => {
+            if (index === currentSlide) {
+                indicator.classList.add('active', 'bg-white');
+                indicator.classList.remove('bg-white/30');
+            } else {
+                indicator.classList.remove('active', 'bg-white');
+                indicator.classList.add('bg-white/30');
+            }
+        });
+        
+        // Update button states
+        prevBtn.style.opacity = currentSlide === 0 ? '0.5' : '1';
+        nextBtn.style.opacity = currentSlide === totalSlides - 1 ? '0.5' : '1';
+    }
+    
+    function nextSlide() {
+        if (currentSlide < totalSlides - 1) {
+            currentSlide++;
+            updateCarousel();
+        }
+    }
+    
+    function prevSlide() {
+        if (currentSlide > 0) {
+            currentSlide--;
+            updateCarousel();
+        }
+    }
+    
+    // Event listeners
+    nextBtn.addEventListener('click', nextSlide);
+    prevBtn.addEventListener('click', prevSlide);
+    
+    // Indicator clicks
+    indicators.forEach((indicator, index) => {
+        indicator.addEventListener('click', () => {
+            currentSlide = index;
+            updateCarousel();
+        });
+    });
+    
+    // Touch/swipe support
+    let startX = 0;
+    let endX = 0;
+    
+    carouselTrack.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+    });
+    
+    carouselTrack.addEventListener('touchend', (e) => {
+        endX = e.changedTouches[0].clientX;
+        handleSwipe();
+    });
+    
+    function handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = startX - endX;
+        
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                // Swipe left - next slide
+                nextSlide();
+            } else {
+                // Swipe right - previous slide
+                prevSlide();
+            }
+        }
+    }
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') {
+            prevSlide();
+        } else if (e.key === 'ArrowRight') {
+            nextSlide();
+        }
+    });
+    
+    // Initialize carousel
+    updateCarousel();
+}
