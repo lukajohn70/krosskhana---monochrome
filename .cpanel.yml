@@ -2,4 +2,5 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home1/krosskha/public_html/
-    - /bin/cp -R * $DEPLOYPATH
+    - /bin/chmod -R u+w $DEPLOYPATH 2>/dev/null || true
+    - /bin/cp -Rf * $DEPLOYPATH
