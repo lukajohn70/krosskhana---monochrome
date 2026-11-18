@@ -24,6 +24,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo = getDBConnection();
         if ($pdo) {
             try {
+                // Ensure password_resets table exists (self-healing)
+                $pdo->exec("
+                CREATE TABLE IF NOT EXISTS password_resets (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    admin_id INT NOT NULL,
+                    email VARCHAR(255) NOT NULL,
+                    token_hash VARCHAR(255) NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    used_at DATETIME NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_token_hash (token_hash),
+                    INDEX idx_admin_id (admin_id),
+                    INDEX idx_email (email),
+                    FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                ");
+
                 $stmt = $pdo->prepare("SELECT id, username, email FROM admin_users WHERE (username = ? OR email = ?) AND is_active = 1 LIMIT 1");
                 $stmt->execute([$identifier, $identifier]);
                 $user = $stmt->fetch();
@@ -89,18 +106,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $sent = sendEmail($user['email'], $subject, $emailBody, true);
 
+                    if ($sent) {
+                        $message = 'Password reset instructions have been sent to ' . htmlspecialchars($user['email']) . '. Please check your inbox and spam folder.';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'We could not send the reset email at this moment. Please check the server mail logs or contact the administrator.';
+                        $messageType = 'error';
+                    }
+
                     if (DEVELOPMENT_MODE) {
                         $devResetLink = $resetUrl;
                     }
+                } else {
+                    // Ambiguous message for security if user not found
+                    $message = 'If an account matches that email or username, password reset instructions have been sent.';
+                    $messageType = 'success';
                 }
             } catch (Exception $e) {
                 error_log("Password reset error: " . $e->getMessage());
+                $message = 'An error occurred while processing your request. Please try again.';
+                $messageType = 'error';
             }
+        } else {
+            $message = 'Database connection error. Please try again later.';
+            $messageType = 'error';
         }
-
-        // Always show the same friendly message to prevent email enumeration
-        $message = 'If an account matches that email or username, password reset instructions have been sent.';
-        $messageType = 'success';
     }
 }
 ?>

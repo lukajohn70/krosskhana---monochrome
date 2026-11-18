@@ -61,7 +61,7 @@ if ($isDevelopment) {
     define('SMTP_HOST', 'mail.krosskhana.org');
     define('SMTP_PORT', '587');
     define('SMTP_USERNAME', 'info@krosskhana.org');
-    define('SMTP_PASSWORD', 'krosskhana@123');
+    define('SMTP_PASSWORD', 'x=?vquYERX_JRRUo');
     define('SMTP_SECURE', 'tls');
     define('FROM_EMAIL', 'info@krosskhana.org');
     define('FROM_NAME', 'Krosskhana Motorsports');
@@ -73,7 +73,7 @@ if ($isDevelopment) {
     
     // Production error reporting
     define('DISPLAY_ERRORS', false);
-    define('LOG_ERRORS', false);
+    define('LOG_ERRORS', true);
 }
 
 // Common settings for both environments

@@ -20,52 +20,84 @@ require_once __DIR__ . '/functions.php';
  * Send email using PHPMailer with SMTP
  */
 function sendEmail($to, $subject, $message, $isHTML = true) {
-    // Always send emails in production - remove development mode check
-    // The environment detection should handle this properly
-    
     // Check if PHPMailer is available
-    if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
-        error_log("PHPMailer not found. Please install it via Composer or download manually.");
-        return false;
-    }
-    
-    try {
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
-        
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host = SMTP_HOST;
-        $mail->SMTPAuth = true;
-        $mail->Username = SMTP_USERNAME;
-        $mail->Password = SMTP_PASSWORD;
-        $mail->SMTPSecure = SMTP_SECURE;
-        $mail->Port = SMTP_PORT;
-        
-        // Timeout settings to prevent hanging
-        $mail->Timeout = 10; // 10 seconds timeout
-        $mail->SMTPKeepAlive = false; // Don't keep connection alive
-        
-        // Recipients
-        $mail->setFrom(FROM_EMAIL, FROM_NAME);
-        $mail->addAddress($to);
-        
-        // Content
-        $mail->isHTML($isHTML);
-        $mail->Subject = $subject;
-        $mail->Body = $message;
-        
-        if (!$isHTML) {
-            $mail->AltBody = strip_tags($message);
+    if (class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+        try {
+            $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+            
+            // Server settings
+            $mail->isSMTP();
+            $mail->Host = SMTP_HOST;
+            $mail->SMTPAuth = true;
+            $mail->Username = SMTP_USERNAME;
+            $mail->Password = SMTP_PASSWORD;
+            $mail->SMTPSecure = SMTP_SECURE;
+            $mail->Port = SMTP_PORT;
+            
+            // Timeout settings to prevent hanging
+            $mail->Timeout = 10; // 10 seconds timeout
+            $mail->SMTPKeepAlive = false; // Don't keep connection alive
+            
+            // Recipients
+            $mail->setFrom(FROM_EMAIL, FROM_NAME);
+            $mail->addAddress($to);
+            
+            // Content
+            $mail->isHTML($isHTML);
+            $mail->Subject = $subject;
+            $mail->Body = $message;
+            
+            if (!$isHTML) {
+                $mail->AltBody = strip_tags($message);
+            }
+            
+            $mail->send();
+            error_log("Email sent successfully via SMTP to: " . $to);
+            return true;
+            
+        } catch (Exception $e) {
+            $errorInfo = isset($mail) && !empty($mail->ErrorInfo) ? $mail->ErrorInfo : $e->getMessage();
+            error_log("SMTP failed for {$to}: {$errorInfo}. Attempting native mail() fallback...");
         }
-        
-        $mail->send();
-        error_log("Email sent successfully to: " . $to);
-        return true;
-        
-    } catch (Exception $e) {
-        error_log("Email sending failed: " . $mail->ErrorInfo);
-        return false;
+    } else {
+        error_log("PHPMailer not found. Attempting native mail() fallback...");
     }
+
+    // Native PHP mail() fallback
+    try {
+        $fromEmail = defined('FROM_EMAIL') ? FROM_EMAIL : 'info@krosskhana.org';
+        $fromName = defined('FROM_NAME') ? FROM_NAME : 'Krosskhana Motorsports';
+        
+        $headers = [];
+        $headers[] = 'MIME-Version: 1.0';
+        if ($isHTML) {
+            $headers[] = 'Content-type: text/html; charset=utf-8';
+        } else {
+            $headers[] = 'Content-type: text/plain; charset=utf-8';
+        }
+        $headers[] = 'From: ' . $fromName . ' <' . $fromEmail . '>';
+        $headers[] = 'Reply-To: ' . $fromEmail;
+        $headers[] = 'X-Mailer: PHP/' . phpversion();
+
+        $headerStr = implode("\r\n", $headers);
+        $additionalParams = '-f' . $fromEmail;
+
+        $sent = @mail($to, $subject, $message, $headerStr, $additionalParams);
+        if (!$sent) {
+            $sent = @mail($to, $subject, $message, $headerStr);
+        }
+
+        if ($sent) {
+            error_log("Email sent successfully via native mail() to: " . $to);
+            return true;
+        } else {
+            error_log("Native mail() also failed to send to: " . $to);
+        }
+    } catch (Throwable $nativeEx) {
+        error_log("Native mail() exception: " . $nativeEx->getMessage());
+    }
+
+    return false;
 }
 
 /**
