@@ -1,69 +1,71 @@
 # cPanel Git Version Control & Deployment Guide
 **Domain**: `https://krosskhana.org`  
 **cPanel Account**: `krosskha`  
-**Production Document Root**: `/home/krosskha/public_html/`  
+**Server Home Directory**: `/home1/krosskha/`  
+**Production Document Root**: `/home1/krosskha/public_html/`  
+**Repository Path on Server**: `/home1/krosskha/repositories/krosskhana---monochrome`  
+**Remote GitHub URL**: `https://github.com/lukajohn70/krosskhana---monochrome.git`  
 
 ---
 
 ## 🚀 1. How cPanel Version Control Works
 
-This repository contains a configured [`.cpanel.yml`](file:///.cpanel.yml) file. When you push to cPanel (or deploy via cPanel Git Version Control), cPanel automatically executes the deployment tasks to copy files to `/home/krosskha/public_html/`.
+This repository contains a configured [`.cpanel.yml`](file:///.cpanel.yml) file. When you deploy via cPanel Git Version Control, cPanel automatically executes the deployment tasks to copy files to `/home1/krosskha/public_html/`.
 
 ### `.cpanel.yml` Deployment Script:
 ```yaml
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/krosskha/public_html/
+    - export DEPLOYPATH=/home1/krosskha/public_html/
     - /bin/cp -R * $DEPLOYPATH
-    - /bin/chmod -R 755 $DEPLOYPATH/admin
-    - /bin/chmod -R 755 $DEPLOYPATH/assets
-    - /bin/chmod -R 755 $DEPLOYPATH/includes
-    - /bin/chmod 755 $DEPLOYPATH/index.php
 ```
 
 ---
 
 ## 🛠️ 2. Setting Up Git in cPanel
 
-### Method A: Direct cPanel Git Push (Recommended)
-1. Log into your **cPanel** at `https://krosskhana.org:2083`.
-2. Under the **Files** section, click **Git™ Version Control**.
-3. Click the **Create** button.
-4. Toggle **Create a New Repository**.
-   - **Repository Path**: `repositories/krosskhana`
-   - **Repository Name**: `krosskhana`
-5. Click **Create**.
-6. Copy the **Clone URL** provided by cPanel (e.g., `ssh://krosskha@krosskhana.org/home/krosskha/repositories/krosskhana` or custom SSH port).
-7. On your local machine in terminal, add the remote and push:
-   ```bash
-   git remote add cpanel ssh://krosskha@krosskhana.org/home/krosskha/repositories/krosskhana
-   git push cpanel master
-   ```
-8. In cPanel, click **Manage** -> **Pull or Deploy** -> **Deploy HEAD Commit** (or enable automated deployment).
+### Method B: Via GitHub (Current Configuration)
+1. Repository on GitHub: `https://github.com/lukajohn70/krosskhana---monochrome.git`.
+2. In cPanel **Git™ Version Control**:
+   - Repository Path: `/home1/krosskha/repositories/krosskhana---monochrome`
+   - Remote URL: `https://github.com/lukajohn70/krosskhana---monochrome.git`
+   - Checked-Out Branch: `main`
+3. In cPanel, under **Manage** -> **Pull or Deploy**:
+   - Click **Update from Remote** to pull the latest commits.
+   - Click **Deploy HEAD Commit** to copy all files live to `/home1/krosskha/public_html/`.
 
 ---
 
-### Method B: Via GitHub / GitLab
-1. Create a repository on GitHub (e.g., `https://github.com/lukajohn70/krosskhana.git`).
-2. Locally, set origin and push:
-   ```bash
-   git remote add origin https://github.com/lukajohn70/krosskhana.git
-   git push -u origin master
-   ```
-3. In cPanel **Git™ Version Control**:
-   - Click **Create**.
-   - Toggle **Clone a Repository**.
-   - **Clone URL**: `https://github.com/lukajohn70/krosskhana.git`
-   - **Repository Path**: `repositories/krosskhana`
-   - Click **Create**.
-4. In cPanel, under **Manage** -> **Pull or Deploy**:
-   - Click **Update from Remote**.
-   - Click **Deploy HEAD Commit** to push live to `/home/krosskha/public_html/`.
+## ⚠️ 3. Troubleshooting cPanel "The system cannot deploy" Errors
+
+If cPanel shows:
+> *"The system cannot deploy. For deployment, ensure that your repository meets the following requirements: A valid .cpanel.yml file exists... No uncommitted changes exist on the checked-out branch."*
+
+Here is how to resolve each requirement:
+
+### A. "A valid .cpanel.yml file exists"
+- **Cause**: The server path in older configurations was set to `/home/krosskha/public_html/`, but your server account root is actually `/home1/krosskha/public_html/`.
+- **Fix**: The repository now has the correct path `/home1/krosskha/public_html/`. Click **Update from Remote** in cPanel to fetch this fix before clicking Deploy.
+
+### B. "No uncommitted changes exist on the checked-out branch"
+- **Cause**: If any file inside `/home1/krosskha/repositories/krosskhana---monochrome` was edited, created, or generated directly on the server (e.g., via File Manager or cPanel editor), Git considers the branch "dirty" and will refuse to deploy.
+- **Fix (Terminal in cPanel)**:
+  1. Open **Terminal** in cPanel (under the "Advanced" or "Tools" section).
+  2. Run:
+     ```bash
+     cd /home1/krosskha/repositories/krosskhana---monochrome
+     git reset --hard HEAD
+     git clean -fd
+     git status
+     ```
+  3. Ensure it reports `nothing to commit, working tree clean`.
+  4. Run `git pull origin main`.
+  5. Go back to cPanel **Git™ Version Control** &rarr; **Pull or Deploy** &rarr; click **Deploy HEAD Commit**.
 
 ---
 
-## 🔐 3. Database Migration for 2FA & Password Reset
+## 🔐 4. Database Migration for 2FA & Password Reset
 
 Ensure the production database on cPanel has the new schema:
 1. Open **phpMyAdmin** in cPanel.

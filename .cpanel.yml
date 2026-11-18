@@ -1,9 +1,5 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/krosskha/public_html/
+    - export DEPLOYPATH=/home1/krosskha/public_html/
     - /bin/cp -R * $DEPLOYPATH
-    - /bin/chmod -R 755 $DEPLOYPATH/admin
-    - /bin/chmod -R 755 $DEPLOYPATH/assets
-    - /bin/chmod -R 755 $DEPLOYPATH/includes
-    - /bin/chmod 755 $DEPLOYPATH/index.php
