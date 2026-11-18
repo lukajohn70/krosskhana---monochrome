@@ -90,13 +90,13 @@ CREATE TABLE IF NOT EXISTS password_resets (
 
 -- 2. 2FA Columns for admin_users
 ALTER TABLE admin_users 
-    ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(255) NULL AFTER role,
-    ADD COLUMN IF NOT EXISTS two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER two_factor_secret,
-    ADD COLUMN IF NOT EXISTS two_factor_confirmed_at DATETIME NULL AFTER two_factor_enabled,
-    ADD COLUMN IF NOT EXISTS recovery_codes TEXT NULL AFTER two_factor_confirmed_at,
-    ADD COLUMN IF NOT EXISTS temp_2fa_code VARCHAR(20) NULL AFTER recovery_codes,
-    ADD COLUMN IF NOT EXISTS temp_2fa_expires_at DATETIME NULL AFTER temp_2fa_code,
-    ADD COLUMN IF NOT EXISTS must_setup_2fa TINYINT(1) NOT NULL DEFAULT 1 AFTER temp_2fa_expires_at;
+    ADD COLUMN two_factor_secret VARCHAR(255) NULL AFTER role,
+    ADD COLUMN two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER two_factor_secret,
+    ADD COLUMN two_factor_confirmed_at DATETIME NULL AFTER two_factor_enabled,
+    ADD COLUMN recovery_codes TEXT NULL AFTER two_factor_confirmed_at,
+    ADD COLUMN temp_2fa_code VARCHAR(20) NULL AFTER recovery_codes,
+    ADD COLUMN temp_2fa_expires_at DATETIME NULL AFTER temp_2fa_code,
+    ADD COLUMN must_setup_2fa TINYINT(1) NOT NULL DEFAULT 1 AFTER temp_2fa_expires_at;
 ```
 
 ---
