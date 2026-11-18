@@ -83,6 +83,35 @@ try {
 } catch (Exception $e) {
     error_log('Error loading team members: ' . $e->getMessage());
 }
+
+// Fetch site video settings and active gallery videos
+$splashVideoUrl = 'assets/videos/2.mp4';
+$heroVideoUrl = 'assets/videos/1.mp4';
+$galleryVideos = [];
+
+try {
+    if ($eventsPdo) {
+        // Fetch splash & hero settings
+        $settingsStmt = $eventsPdo->query("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ('splash_video_url', 'hero_video_url')");
+        if ($settingsStmt) {
+            $settingsMap = $settingsStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            if (!empty($settingsMap['splash_video_url'])) {
+                $splashVideoUrl = $settingsMap['splash_video_url'];
+            }
+            if (!empty($settingsMap['hero_video_url'])) {
+                $heroVideoUrl = $settingsMap['hero_video_url'];
+            }
+        }
+
+        // Fetch published gallery videos
+        $galleryStmt = $eventsPdo->query("SELECT * FROM media_gallery WHERE is_active = 1 AND media_type = 'video' ORDER BY sort_order ASC, id DESC");
+        if ($galleryStmt) {
+            $galleryVideos = $galleryStmt->fetchAll();
+        }
+    }
+} catch (Exception $e) {
+    error_log('Error loading video settings / gallery: ' . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -343,7 +372,7 @@ try {
         <!-- Video Background with Zoom Effect -->
         <div class="absolute inset-0 overflow-hidden">
             <video id="splash-video" class="absolute inset-0 w-full h-full object-cover scale-150 transition-transform duration-10000 ease-out" autoplay muted playsinline>
-                <source src="assets/videos/2.mp4" type="video/mp4">
+                <source src="<?php echo htmlspecialchars($splashVideoUrl); ?>" type="video/mp4">
             </video>
         </div>
 
@@ -413,6 +442,11 @@ try {
                     </button>
                 </li>
                 <li>
+                    <button onclick="scrollToSection('gallery')" class="nav-link relative px-3 py-2 rounded-full transition-all duration-300 group text-gray-300 hover:bg-gray-600 hover:text-white">
+                        <span class="relative z-10">Gallery</span>
+                    </button>
+                </li>
+                <li>
                     <button onclick="scrollToSection('participate')" class="nav-link relative px-3 py-2 rounded-full transition-all duration-300 group text-gray-300 hover:bg-gray-600 hover:text-white">
                         <span class="relative z-10">Join</span>
                     </button>
@@ -464,6 +498,11 @@ try {
                         </button>
                     </li>
                     <li>
+                        <button onclick="scrollToSection('gallery')" class="mobile-nav-link relative w-full text-left px-4 py-3 rounded-lg transition-all duration-300 group text-gray-300 hover:bg-gray-600 hover:text-white">
+                            <span class="relative z-10">Gallery</span>
+                        </button>
+                    </li>
+                    <li>
                         <button onclick="scrollToSection('participate')" class="mobile-nav-link relative w-full text-left px-4 py-3 rounded-lg transition-all duration-300 group text-gray-300 hover:bg-gray-600 hover:text-white">
                             <span class="relative z-10">Join</span>
                         </button>
@@ -509,7 +548,7 @@ try {
         <!-- Dynamic video background with enhanced overlay -->
         <video
             class="absolute inset-0 w-full h-full object-cover z-0"
-            src="assets/videos/1.mp4"
+            src="<?php echo htmlspecialchars($heroVideoUrl); ?>"
             autoplay
             loop
             muted
@@ -1145,6 +1184,86 @@ try {
         </div>
     </section>
 
+    <!-- Motorsports Video Gallery Section -->
+    <section id="gallery" class="py-20 md:py-32 relative overflow-hidden bg-black text-white">
+        <div class="absolute inset-0 bg-gradient-to-b from-gray-950 via-black to-gray-950"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent pointer-events-none"></div>
+
+        <div class="container mx-auto px-4 relative z-10">
+            <div class="text-center mb-16">
+                <span class="text-xs uppercase tracking-widest font-semibold px-4 py-1.5 rounded-full border border-white/20 bg-white/5 text-gray-300 inline-block mb-4">
+                    High-Octane Media
+                </span>
+                <h3 class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400 mb-4 font-orbitron">
+                    Motorsports Gallery
+                </h3>
+                <p class="text-base md:text-lg text-gray-400 max-w-2xl mx-auto">
+                    Immerse yourself in precision drift lines, timed autocross runs, and full-throttle automotive culture.
+                </p>
+                <div class="w-28 h-1 bg-gradient-to-r from-white via-gray-400 to-transparent mx-auto rounded-full mt-6"></div>
+            </div>
+
+            <?php if (empty($galleryVideos)): ?>
+                <div class="text-center py-12 text-gray-500">
+                    <i class="fas fa-video text-4xl mb-3 text-gray-600"></i>
+                    <p class="text-sm">Video gallery updates coming soon.</p>
+                </div>
+            <?php else: ?>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                    <?php foreach ($galleryVideos as $v): 
+                        $isYt = ($v['video_source'] === 'youtube');
+                        $isVim = ($v['video_source'] === 'vimeo');
+                    ?>
+                    <div class="group relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/30 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl flex flex-col justify-between">
+                        <div>
+                            <!-- Video Thumbnail / Player Preview -->
+                            <div class="relative aspect-video bg-black overflow-hidden cursor-pointer" onclick="openVideoLightbox('<?php echo htmlspecialchars($v['file_url']); ?>', '<?php echo htmlspecialchars($v['video_source']); ?>', '<?php echo htmlspecialchars($v['embed_id'] ?? ''); ?>', '<?php echo htmlspecialchars(addslashes($v['title'])); ?>')">
+                                <?php if ($isYt && !empty($v['embed_id'])): ?>
+                                    <img src="https://img.youtube.com/vi/<?php echo htmlspecialchars($v['embed_id']); ?>/hqdefault.jpg" alt="<?php echo htmlspecialchars($v['title']); ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
+                                <?php else: ?>
+                                    <video class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" preload="metadata" muted>
+                                        <source src="<?php echo htmlspecialchars($v['file_url']); ?>" type="video/mp4">
+                                    </video>
+                                <?php endif; ?>
+                                
+                                <div class="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <div class="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-white group-hover:text-black transition-all duration-300 shadow-xl">
+                                        <i class="fas fa-play text-lg ml-1"></i>
+                                    </div>
+                                </div>
+
+                                <div class="absolute top-3 left-3">
+                                    <span class="px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase rounded-full bg-black/70 text-white backdrop-blur-md border border-white/20">
+                                        <?php echo htmlspecialchars($v['category'] ?? 'Motorsport'); ?>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Video Details -->
+                            <div class="p-6">
+                                <h4 class="text-xl font-bold text-white mb-2 group-hover:text-gray-200 transition-colors font-orbitron">
+                                    <?php echo htmlspecialchars($v['title']); ?>
+                                </h4>
+                                <?php if (!empty($v['description'])): ?>
+                                    <p class="text-sm text-gray-400 leading-relaxed line-clamp-2">
+                                        <?php echo htmlspecialchars($v['description']); ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <div class="px-6 pb-6 pt-0">
+                            <button onclick="openVideoLightbox('<?php echo htmlspecialchars($v['file_url']); ?>', '<?php echo htmlspecialchars($v['video_source']); ?>', '<?php echo htmlspecialchars($v['embed_id'] ?? ''); ?>', '<?php echo htmlspecialchars(addslashes($v['title'])); ?>')" class="inline-flex items-center text-xs font-semibold uppercase tracking-wider text-gray-300 group-hover:text-white transition-colors">
+                                Watch Full Clip <i class="fas fa-arrow-right ml-2 text-[10px] transform group-hover:translate-x-1 transition-transform"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </section>
+
     <!-- Join the Revolution Section -->
     <section id="participate" class="py-8 md:py-12 lg:py-20 relative overflow-hidden">
         <div class="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"></div>
@@ -1611,7 +1730,61 @@ try {
                 if (e.key === 'Escape') closeEventDetailsModal();
             });
         });
+
+        // Video Lightbox Controller
+        function openVideoLightbox(videoUrl, videoSource, embedId, title) {
+            const modal = document.getElementById('video-lightbox-modal');
+            const container = document.getElementById('video-lightbox-container');
+            const titleEl = document.getElementById('video-lightbox-title');
+
+            if (!modal || !container) return;
+
+            titleEl.textContent = title || 'Motorsports Video';
+
+            if (videoSource === 'youtube' && embedId) {
+                container.innerHTML = `<iframe class="w-full h-full aspect-video rounded-xl shadow-2xl" src="https://www.youtube.com/embed/${embedId}?autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+            } else if (videoSource === 'vimeo' && embedId) {
+                container.innerHTML = `<iframe class="w-full h-full aspect-video rounded-xl shadow-2xl" src="https://player.vimeo.com/video/${embedId}?autoplay=1" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`;
+            } else {
+                container.innerHTML = `
+                    <video class="w-full h-full aspect-video rounded-xl shadow-2xl bg-black" controls autoplay playsinline>
+                        <source src="${videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+            }
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeVideoLightbox() {
+            const modal = document.getElementById('video-lightbox-modal');
+            const container = document.getElementById('video-lightbox-container');
+            if (modal) modal.classList.add('hidden');
+            if (container) container.innerHTML = '';
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeVideoLightbox();
+        });
     </script>
+
+    <!-- Motorsports Video Lightbox Modal -->
+    <div id="video-lightbox-modal" class="fixed inset-0 z-[99998] bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="relative max-w-4xl w-full flex flex-col">
+            <div class="flex items-center justify-between pb-3 text-white">
+                <h4 id="video-lightbox-title" class="text-lg font-bold font-orbitron truncate max-w-md">Motorsports Video</h4>
+                <button onclick="closeVideoLightbox()" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white" aria-label="Close modal">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+            <div id="video-lightbox-container" class="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl">
+                <!-- Video/iFrame injected dynamically -->
+            </div>
+        </div>
+    </div>
 
     <!-- Notification Modal -->
     <div id="notification-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">

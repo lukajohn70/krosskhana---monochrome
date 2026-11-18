@@ -433,4 +433,66 @@ function ensureCoreTables(PDO $pdo) {
     } catch (Throwable $e) {
         error_log('ensureCoreTables: explore_items error: ' . $e->getMessage());
     }
+
+    // 11. site_settings (for splash video, hero video, etc.)
+    try {
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS site_settings (
+            setting_key VARCHAR(100) PRIMARY KEY,
+            setting_value TEXT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // Seed default site settings if not present
+        $defaultSettings = [
+            'splash_video_url' => 'assets/videos/2.mp4',
+            'hero_video_url' => 'assets/videos/1.mp4',
+            'site_name' => 'Krosskhana Motorsports'
+        ];
+
+        foreach ($defaultSettings as $k => $v) {
+            $stmt = $pdo->prepare("INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)");
+            $stmt->execute([$k, $v]);
+        }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: site_settings error: ' . $e->getMessage());
+    }
+
+    // 12. media_gallery (for gallery videos & images)
+    try {
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS media_gallery (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            description TEXT NULL,
+            media_type ENUM('video', 'image') NOT NULL DEFAULT 'video',
+            file_url VARCHAR(500) NOT NULL,
+            thumbnail_url VARCHAR(500) NULL,
+            video_source ENUM('local', 'youtube', 'vimeo') NOT NULL DEFAULT 'local',
+            embed_id VARCHAR(100) NULL,
+            category VARCHAR(100) DEFAULT 'Motorsports',
+            sort_order INT DEFAULT 0,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_active_type (is_active, media_type),
+            INDEX idx_sort_order (sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
+        // Seed initial gallery videos if empty
+        $mediaCount = $pdo->query("SELECT COUNT(*) FROM media_gallery")->fetchColumn();
+        if ($mediaCount == 0) {
+            $pdo->exec("
+            INSERT INTO media_gallery (title, description, media_type, file_url, video_source, category, sort_order, is_active) VALUES
+            ('Championship Highlights 2025', 'High-octane gymkhana and precision drift action from the national cup.', 'video', 'assets/videos/1.mp4', 'local', 'Drift & Gymkhana', 1, 1),
+            ('Track Assault & Time Attack', 'Behind the wheel with top drivers pushing limits through the apex.', 'video', 'assets/videos/2.mp4', 'local', 'Time Attack', 2, 1),
+            ('Night Drift & Lifestyle Showcase', 'Under the floodlights: sound, tire smoke, and custom machine culture.', 'video', 'assets/videos/3.mp4', 'local', 'Night Drift', 3, 1),
+            ('Precision Slalom & Exhibition', 'Masterclass car control maneuver through challenging technical cones.', 'video', 'assets/videos/4.mp4', 'local', 'Precision Gymkhana', 4, 1);
+            ");
+        }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: media_gallery error: ' . $e->getMessage());
+    }
 }

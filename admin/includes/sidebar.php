@@ -54,6 +54,11 @@
                 <span class="font-medium text-sm lg:text-base">Explore</span>
             </a>
 
+            <a href="media.php" class="flex items-center px-3 py-2 lg:px-4 lg:py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg <?php echo basename($_SERVER['PHP_SELF']) == 'media.php' ? 'text-white bg-gray-800/50 border border-gray-700/50' : ''; ?>">
+                <i class="fas fa-photo-video mr-2 lg:mr-3 text-sm lg:text-base"></i>
+                <span class="font-medium text-sm lg:text-base">Media & Videos</span>
+            </a>
+
             <a href="team.php" class="flex items-center px-3 py-2 lg:px-4 lg:py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg <?php echo basename($_SERVER['PHP_SELF']) == 'team.php' ? 'text-white bg-gray-800/50 border border-gray-700/50' : ''; ?>">
                 <i class="fas fa-users mr-2 lg:mr-3 text-sm lg:text-base"></i>
                 <span class="font-medium text-sm lg:text-base">Team</span>
