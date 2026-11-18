@@ -646,7 +646,212 @@ if ($pdo) {
         }
 
         function viewRegistration(id) {
-            window.open(`registration-details.php?id=${id}`, '_blank');
+            fetch(`api/registrations.php?id=${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showRegistrationModal(data.data);
+                    } else {
+                        showError(data.message || 'Error loading registration details');
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    window.open(`registration-details.php?id=${id}`, '_blank');
+                });
+        }
+
+        function showRegistrationModal(reg) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4';
+            modal.id = 'registration-modal';
+
+            const dateStr = reg.created_at ? new Date(reg.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
+            const statusColor = reg.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                (reg.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                                (reg.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'));
+
+            // Disciplines
+            const disciplines = [];
+            if (reg.autocross_competitor == 1) disciplines.push('Autocross');
+            if (reg.drifting_challenge == 1) disciplines.push('Drifting Challenge');
+            if (reg.exhibition_driver == 1) disciplines.push('Exhibition Driver');
+            if (reg.safety_training == 1) disciplines.push('Safety Training');
+
+            // Experience
+            let expLevel = 'Unspecified';
+            if (reg.professional == 1) expLevel = 'Professional';
+            else if (reg.semi_pro == 1) expLevel = 'Semi-Pro';
+            else if (reg.intermediate == 1) expLevel = 'Intermediate';
+            else if (reg.novice == 1) expLevel = 'Novice';
+
+            modal.innerHTML = `
+                <div class="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 my-8">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-gray-900 via-gray-800 to-black px-6 py-5 text-white flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center font-bold text-lg text-white border border-white/20">
+                                <i class="fas fa-flag-checkered"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-white">${reg.full_name || 'Driver Registration'}</h3>
+                                <div class="flex items-center space-x-2 text-xs text-gray-300 mt-0.5">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full ${statusColor} font-bold">
+                                        ${reg.status || 'pending'}
+                                    </span>
+                                    <span>•</span>
+                                    <span>Alias: <strong>${reg.racing_alias || 'None'}</strong></span>
+                                    <span>•</span>
+                                    <span>Level: ${expLevel}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="closeRegistrationModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                        <!-- Contact Card -->
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Driver Contact & Location</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                                <div>
+                                    <p class="text-gray-500 font-medium">Email</p>
+                                    <a href="mailto:${reg.email}" class="text-sm font-semibold text-blue-600 hover:underline truncate block mt-0.5">${reg.email}</a>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 font-medium">Phone</p>
+                                    <a href="tel:${reg.phone}" class="text-sm font-semibold text-gray-900 hover:underline block mt-0.5">${reg.phone}</a>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 font-medium">Base / Location</p>
+                                    <p class="text-sm font-semibold text-gray-900 mt-0.5">${reg.location || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vehicle Specs -->
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-1.5">
+                                <i class="fas fa-car text-gray-600"></i> Vehicle Spec Sheet
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs mb-3">
+                                <div>
+                                    <p class="text-gray-500 font-medium">Make</p>
+                                    <p class="text-sm font-bold text-gray-900 mt-0.5">${reg.vehicle_make || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 font-medium">Model</p>
+                                    <p class="text-sm font-bold text-gray-900 mt-0.5">${reg.vehicle_model || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-500 font-medium">Year</p>
+                                    <p class="text-sm font-bold text-gray-900 mt-0.5">${reg.vehicle_year || 'N/A'}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 font-medium mb-1">Vehicle Modifications:</p>
+                                <div class="p-3 bg-white rounded-lg border border-gray-200 text-xs text-gray-700 whitespace-pre-wrap">${reg.modifications || 'Stock / No modifications listed'}</div>
+                            </div>
+                        </div>
+
+                        <!-- Disciplines & Experience -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Racing Disciplines</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    ${disciplines.length > 0 ? disciplines.map(d => `
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-gray-900 text-white text-xs font-semibold">
+                                            <i class="fas fa-check text-xs mr-1 text-green-400"></i> ${d}
+                                        </span>
+                                    `).join('') : '<span class="text-sm text-gray-400">General Registration</span>'}
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Experience Tier</h4>
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-bold">
+                                    <i class="fas fa-trophy mr-1.5 text-indigo-600"></i> ${expLevel}
+                                </span>
+                            </div>
+                        </div>
+
+                        ${reg.additional_info ? `
+                        <div>
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Driver Bio / Additional Notes</h4>
+                            <p class="p-3 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-700 whitespace-pre-wrap">${reg.additional_info}</p>
+                        </div>
+                        ` : ''}
+
+                        <!-- Admin Notes -->
+                        <div class="pt-2 border-t border-gray-100">
+                            <label class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2 block">Internal Admin Notes</label>
+                            <textarea id="reg-admin-notes" rows="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-black focus:border-black" placeholder="Scrutineering notes, license verification, car eligibility...">${reg.admin_notes || ''}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2">
+                            <label class="text-xs font-semibold text-gray-500">Status:</label>
+                            <select id="reg-status-select" class="text-xs font-semibold rounded-lg border-gray-300 py-1.5 px-2.5 bg-white text-gray-700">
+                                <option value="pending" ${reg.status === 'pending' ? 'selected' : ''}>Pending Review</option>
+                                <option value="approved" ${reg.status === 'approved' ? 'selected' : ''}>Approved Driver</option>
+                                <option value="contacted" ${reg.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+                                <option value="rejected" ${reg.status === 'rejected' ? 'selected' : ''}>Rejected / Ineligible</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <a href="registration-details.php?id=${reg.id}" target="_blank" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+                                <i class="fas fa-external-link-alt"></i> Full Page
+                            </a>
+                            <button onclick="saveRegistrationStatusAndNotes(${reg.id})" class="px-4 py-2 text-xs font-bold text-white bg-black rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
+        function closeRegistrationModal() {
+            const modal = document.getElementById('registration-modal');
+            if (modal) modal.remove();
+        }
+
+        function saveRegistrationStatusAndNotes(id) {
+            const status = document.getElementById('reg-status-select').value;
+            const notes = document.getElementById('reg-admin-notes').value;
+
+            showLoading('Saving changes...');
+            fetch('api/registrations.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update_status',
+                    id: id,
+                    status: status,
+                    admin_notes: notes
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                hideLoading();
+                if (data.status === 'success') {
+                    showSuccess('Driver registration updated successfully');
+                    closeRegistrationModal();
+                    loadRegistrationsData();
+                } else {
+                    showError(data.message || 'Failed to update');
+                }
+            })
+            .catch(err => {
+                hideLoading();
+                showError('Failed to save changes');
+            });
         }
 
         function updateStatus(id) {

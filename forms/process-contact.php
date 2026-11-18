@@ -92,8 +92,8 @@ try {
         'message' => 'Thank you for your message! We will get back to you soon. A confirmation email has been sent to your inbox.'
     ]);
     
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     error_log("Contact inquiry error: " . $e->getMessage());
-    sendJSONResponse(['status' => 'error', 'message' => 'An error occurred. Please try again later.'], 500);
+    sendJSONResponse(['status' => 'error', 'message' => 'Failed to send message: ' . $e->getMessage()], 500);
 }
 ?>

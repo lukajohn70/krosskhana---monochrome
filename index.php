@@ -980,38 +980,54 @@ try {
                             $hasImage = !empty($event['image_url']);
                             $gradient = !empty($event['gradient_theme']) ? $event['gradient_theme'] : 'from-white to-gray-300';
                             $badge = !empty($event['badge_text']) ? $event['badge_text'] : 'Past Event';
-                            $buttonText = !empty($event['button_text']) ? $event['button_text'] : 'View Gallery';
+                            $buttonText = !empty($event['button_text']) ? $event['button_text'] : 'View Details';
                             $slug = !empty($event['slug']) ? $event['slug'] : generateSlug($event['title']);
                             $buttonLink = trim($event['button_link'] ?? '');
-                            $isExternalLink = !empty($buttonLink) && (strpos($buttonLink, 'http://') === 0 || strpos($buttonLink, 'https://') === 0 || strpos($buttonLink, '#') === 0 || strpos($buttonLink, '/') === 0);
+                            $isExternalLink = !empty($buttonLink) && (strpos($buttonLink, 'http://') === 0 || strpos($buttonLink, 'https://') === 0);
+
+                            $eventJson = htmlspecialchars(json_encode([
+                                'id' => $event['id'],
+                                'title' => $event['title'],
+                                'slug' => $slug,
+                                'event_type' => 'past',
+                                'badge' => $badge,
+                                'date_text' => $event['event_date_text'],
+                                'description' => $event['description'],
+                                'image_url' => $event['image_url'] ?: 'pictures/1.png',
+                                'button_text' => $buttonText,
+                                'button_link' => $buttonLink,
+                                'is_upcoming' => false
+                            ]), ENT_QUOTES, 'UTF-8');
                         ?>
-                            <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up flex flex-col justify-between">
-                                <div class="relative h-48 <?php echo $hasImage ? 'bg-black' : ('bg-gradient-to-br ' . htmlspecialchars($gradient)); ?> overflow-hidden">
+                            <div onclick="openEventDetailsModal(<?php echo $eventJson; ?>)" class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up flex flex-col justify-between cursor-pointer">
+                                <div class="relative h-52 <?php echo $hasImage ? 'bg-black' : ('bg-gradient-to-br ' . htmlspecialchars($gradient)); ?> overflow-hidden">
                                     <?php if ($hasImage): ?>
-                                        <img src="<?php echo htmlspecialchars($event['image_url']); ?>" alt="<?php echo htmlspecialchars($event['title']); ?>" class="absolute inset-0 w-full h-full object-cover">
-                                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
+                                        <img src="<?php echo htmlspecialchars($event['image_url']); ?>" alt="<?php echo htmlspecialchars($event['title']); ?>" class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+                                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
                                     <?php else: ?>
-                                        <div class="absolute inset-0 bg-black/20"></div>
+                                        <div class="absolute inset-0 bg-black/30"></div>
                                     <?php endif; ?>
-                                    <div class="absolute top-4 right-4 bg-gray-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow">
+                                    <div class="absolute top-4 right-4 bg-black/60 backdrop-blur-md border border-white/20 text-white px-3 py-1 rounded-full text-xs font-bold shadow">
                                         <?php echo htmlspecialchars($badge); ?>
                                     </div>
-                                    <div class="absolute bottom-4 left-4 right-4 <?php echo $hasImage ? 'text-white' : (strpos($gradient, 'from-gray-800') !== false || strpos($gradient, 'from-red-700') !== false ? 'text-white' : 'text-black'); ?>">
+                                    <div class="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/20 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/20 flex items-center gap-1">
+                                        <i class="fas fa-expand text-[10px]"></i> Quick View
+                                    </div>
+                                    <div class="absolute bottom-4 left-4 right-4 text-white">
                                         <h4 class="text-xl font-bold truncate drop-shadow"><?php echo htmlspecialchars($event['title']); ?></h4>
-                                        <p class="text-sm opacity-90"><?php echo htmlspecialchars($event['event_date_text']); ?></p>
+                                        <p class="text-xs text-gray-300 opacity-90 mt-0.5"><i class="fas fa-calendar-alt mr-1"></i> <?php echo htmlspecialchars($event['event_date_text']); ?></p>
                                     </div>
                                 </div>
                                 <div class="p-6 flex-1 flex flex-col justify-between">
-                                    <p class="text-gray-300 mb-6 leading-relaxed"><?php echo htmlspecialchars($event['description']); ?></p>
-                                    <?php if ($isExternalLink): ?>
-                                        <a href="<?php echo htmlspecialchars($buttonLink); ?>" class="w-full text-center block bg-gradient-to-r from-white to-gray-300 text-black font-semibold py-3 rounded-xl hover:from-gray-100 hover:to-gray-400 transition-all duration-300">
-                                            <?php echo htmlspecialchars($buttonText); ?>
-                                        </a>
-                                    <?php else: ?>
-                                        <button onclick="openEventGallery('<?php echo htmlspecialchars($slug); ?>')" class="w-full bg-gradient-to-r from-white to-gray-300 text-black font-semibold py-3 rounded-xl hover:from-gray-100 hover:to-gray-400 transition-all duration-300">
+                                    <p class="text-gray-300 mb-6 leading-relaxed text-sm line-clamp-3"><?php echo htmlspecialchars($event['description']); ?></p>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="event.stopPropagation(); openEventDetailsModal(<?php echo $eventJson; ?>)" class="flex-1 bg-gradient-to-r from-white to-gray-300 text-black font-bold py-3 rounded-xl hover:from-gray-100 hover:to-gray-400 transition-all duration-300 text-sm shadow">
                                             <?php echo htmlspecialchars($buttonText); ?>
                                         </button>
-                                    <?php endif; ?>
+                                        <a href="event.php?slug=<?php echo urlencode($slug); ?>" onclick="event.stopPropagation()" class="px-3.5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors" title="View Full Page">
+                                            <i class="fas fa-external-link-alt text-xs"></i>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -1031,38 +1047,54 @@ try {
                             $hasImage = !empty($event['image_url']);
                             $gradient = !empty($event['gradient_theme']) ? $event['gradient_theme'] : 'from-white to-gray-300';
                             $badge = !empty($event['badge_text']) ? $event['badge_text'] : 'Coming Soon';
-                            $buttonText = !empty($event['button_text']) ? $event['button_text'] : 'Learn More';
+                            $buttonText = !empty($event['button_text']) ? $event['button_text'] : 'View Details';
                             $slug = !empty($event['slug']) ? $event['slug'] : generateSlug($event['title']);
                             $buttonLink = trim($event['button_link'] ?? '');
-                            $isExternalLink = !empty($buttonLink) && (strpos($buttonLink, 'http://') === 0 || strpos($buttonLink, 'https://') === 0 || strpos($buttonLink, '#') === 0 || strpos($buttonLink, '/') === 0);
+                            $isExternalLink = !empty($buttonLink) && (strpos($buttonLink, 'http://') === 0 || strpos($buttonLink, 'https://') === 0);
+
+                            $eventJson = htmlspecialchars(json_encode([
+                                'id' => $event['id'],
+                                'title' => $event['title'],
+                                'slug' => $slug,
+                                'event_type' => 'upcoming',
+                                'badge' => $badge,
+                                'date_text' => $event['event_date_text'],
+                                'description' => $event['description'],
+                                'image_url' => $event['image_url'] ?: 'pictures/1.png',
+                                'button_text' => $buttonText,
+                                'button_link' => $buttonLink,
+                                'is_upcoming' => true
+                            ]), ENT_QUOTES, 'UTF-8');
                         ?>
-                            <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up flex flex-col justify-between">
-                                <div class="relative h-48 <?php echo $hasImage ? 'bg-black' : ('bg-gradient-to-br ' . htmlspecialchars($gradient)); ?> overflow-hidden">
+                            <div onclick="openEventDetailsModal(<?php echo $eventJson; ?>)" class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-gray-700/50 transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up flex flex-col justify-between cursor-pointer">
+                                <div class="relative h-52 <?php echo $hasImage ? 'bg-black' : ('bg-gradient-to-br ' . htmlspecialchars($gradient)); ?> overflow-hidden">
                                     <?php if ($hasImage): ?>
-                                        <img src="<?php echo htmlspecialchars($event['image_url']); ?>" alt="<?php echo htmlspecialchars($event['title']); ?>" class="absolute inset-0 w-full h-full object-cover">
-                                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20"></div>
+                                        <img src="<?php echo htmlspecialchars($event['image_url']); ?>" alt="<?php echo htmlspecialchars($event['title']); ?>" class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+                                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
                                     <?php else: ?>
-                                        <div class="absolute inset-0 bg-black/20"></div>
+                                        <div class="absolute inset-0 bg-black/30"></div>
                                     <?php endif; ?>
-                                    <div class="absolute top-4 right-4 bg-gray-600 text-white px-3 py-1 rounded-full text-sm font-semibold shadow">
+                                    <div class="absolute top-4 right-4 bg-white text-black px-3 py-1 rounded-full text-xs font-black shadow">
                                         <?php echo htmlspecialchars($badge); ?>
                                     </div>
-                                    <div class="absolute bottom-4 left-4 right-4 <?php echo $hasImage ? 'text-white' : (strpos($gradient, 'from-gray-800') !== false || strpos($gradient, 'from-red-700') !== false ? 'text-white' : 'text-black'); ?>">
+                                    <div class="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/20 backdrop-blur-md text-white text-[11px] font-bold px-2.5 py-1 rounded-full border border-white/20 flex items-center gap-1">
+                                        <i class="fas fa-expand text-[10px]"></i> Quick View
+                                    </div>
+                                    <div class="absolute bottom-4 left-4 right-4 text-white">
                                         <h4 class="text-xl font-bold truncate drop-shadow"><?php echo htmlspecialchars($event['title']); ?></h4>
-                                        <p class="text-sm opacity-90"><?php echo htmlspecialchars($event['event_date_text']); ?></p>
+                                        <p class="text-xs text-gray-300 opacity-90 mt-0.5"><i class="fas fa-calendar-alt mr-1"></i> <?php echo htmlspecialchars($event['event_date_text']); ?></p>
                                     </div>
                                 </div>
                                 <div class="p-6 flex-1 flex flex-col justify-between">
-                                    <p class="text-gray-300 mb-6 leading-relaxed"><?php echo htmlspecialchars($event['description']); ?></p>
-                                    <?php if ($isExternalLink): ?>
-                                        <a href="<?php echo htmlspecialchars($buttonLink); ?>" class="w-full text-center block bg-gradient-to-r from-white to-gray-300 text-black font-semibold py-3 rounded-xl hover:from-gray-100 hover:to-gray-400 transition-all duration-300">
-                                            <?php echo htmlspecialchars($buttonText); ?>
-                                        </a>
-                                    <?php else: ?>
-                                        <button onclick="openEventGallery('<?php echo htmlspecialchars($slug); ?>')" class="w-full bg-gradient-to-r from-white to-gray-300 text-black font-semibold py-3 rounded-xl hover:from-gray-100 hover:to-gray-400 transition-all duration-300">
+                                    <p class="text-gray-300 mb-6 leading-relaxed text-sm line-clamp-3"><?php echo htmlspecialchars($event['description']); ?></p>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="event.stopPropagation(); openEventDetailsModal(<?php echo $eventJson; ?>)" class="flex-1 bg-gradient-to-r from-white to-gray-300 text-black font-bold py-3 rounded-xl hover:from-gray-100 hover:to-gray-400 transition-all duration-300 text-sm shadow">
                                             <?php echo htmlspecialchars($buttonText); ?>
                                         </button>
-                                    <?php endif; ?>
+                                        <a href="event.php?slug=<?php echo urlencode($slug); ?>" onclick="event.stopPropagation()" class="px-3.5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors" title="View Full Page">
+                                            <i class="fas fa-external-link-alt text-xs"></i>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -1187,6 +1219,166 @@ try {
                         </a>
                     </div>
                 </div>
+
+                <!-- Interactive "Find Your Grid" Experience Matcher -->
+                <div class="mt-12 max-w-4xl mx-auto bg-white/5 backdrop-blur-xl rounded-3xl p-6 sm:p-10 border border-white/20 shadow-2xl">
+                    <div class="text-center mb-8">
+                        <span class="px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white text-black shadow">
+                            Interactive Matcher
+                        </span>
+                        <h4 class="text-2xl sm:text-3xl font-black text-white mt-3 font-orbitron tracking-tight">
+                            NOT SURE WHERE YOU FIT? FIND YOUR GRID
+                        </h4>
+                        <p class="text-sm text-gray-300 mt-1 max-w-lg mx-auto">
+                            Select your vehicle and track ambition to discover your optimal competition class and track readiness score.
+                        </p>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Step 1: Drive Configuration -->
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-300 mb-3 flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-white text-black text-[11px] font-black flex items-center justify-center">1</span>
+                                Select Your Machine / Setup:
+                            </label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5" id="matcher-drivetrain">
+                                <button type="button" onclick="selectMatcher('drive', 'rwd', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-car mr-1 text-gray-400"></i> RWD Spec</div>
+                                    <p class="text-[10px] text-gray-400">Rear-wheel sports / drift coupe</p>
+                                </button>
+                                <button type="button" onclick="selectMatcher('drive', 'awd', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-bolt mr-1 text-gray-400"></i> AWD Turbo</div>
+                                    <p class="text-[10px] text-gray-400">All-wheel drive grip weapon</p>
+                                </button>
+                                <button type="button" onclick="selectMatcher('drive', 'fwd', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-car-side mr-1 text-gray-400"></i> FWD Hot Hatch</div>
+                                    <p class="text-[10px] text-gray-400">Front-wheel precision street</p>
+                                </button>
+                                <button type="button" onclick="selectMatcher('drive', 'exotic', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-crown mr-1 text-gray-400"></i> Exotic / Supercar</div>
+                                    <p class="text-[10px] text-gray-400">High-end performance build</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Ambition -->
+                        <div>
+                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-300 mb-3 flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-white text-black text-[11px] font-black flex items-center justify-center">2</span>
+                                Select Your Track Ambition:
+                            </label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5" id="matcher-goal">
+                                <button type="button" onclick="selectMatcher('goal', 'drift', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-fire mr-1 text-gray-400"></i> Drift Battle</div>
+                                    <p class="text-[10px] text-gray-400">Angle, tire smoke & tandem</p>
+                                </button>
+                                <button type="button" onclick="selectMatcher('goal', 'timeattack', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-stopwatch mr-1 text-gray-400"></i> Autocross Apex</div>
+                                    <p class="text-[10px] text-gray-400">Slalom precision & lap times</p>
+                                </button>
+                                <button type="button" onclick="selectMatcher('goal', 'showcase', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-gem mr-1 text-gray-400"></i> Paddock Show</div>
+                                    <p class="text-[10px] text-gray-400">Exhibition & VIP paddock</p>
+                                </button>
+                                <button type="button" onclick="selectMatcher('goal', 'training', this)" class="matcher-btn p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-left transition-all">
+                                    <div class="text-xs font-bold text-white mb-0.5"><i class="fas fa-graduation-cap mr-1 text-gray-400"></i> Track Clinic</div>
+                                    <p class="text-[10px] text-gray-400">First-timer driver coaching</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Live Calculated Result Card -->
+                        <div id="matcher-result" class="p-6 rounded-2xl bg-gradient-to-r from-white/10 via-black to-white/10 border border-white/30 text-white flex flex-col sm:flex-row items-center justify-between gap-6">
+                            <div>
+                                <span class="text-[11px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Your Recommended Competition Class:</span>
+                                <h5 id="matcher-class-title" class="text-xl sm:text-2xl font-black text-white font-orbitron">Pro-Am Drift Battle</h5>
+                                <p id="matcher-class-desc" class="text-xs text-gray-300 mt-1 max-w-md">Tailored for rear-wheel drivers mastering clipping points, throttle modulation, and judged tandem runs.</p>
+                            </div>
+                            <div class="flex items-center gap-3 shrink-0">
+                                <a id="matcher-cta-btn" href="racer-registration.php" class="px-6 py-3.5 bg-gradient-to-r from-white to-gray-300 text-black font-black text-xs sm:text-sm rounded-xl shadow-xl hover:from-gray-100 hover:to-gray-400 transition-all text-center">
+                                    Claim Grid Spot
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    let currentDrive = 'rwd';
+                    let currentGoal = 'drift';
+
+                    function selectMatcher(type, val, btn) {
+                        if (type === 'drive') {
+                            currentDrive = val;
+                            document.querySelectorAll('#matcher-drivetrain .matcher-btn').forEach(b => {
+                                b.classList.remove('bg-white', 'text-black', 'border-white');
+                                b.classList.add('bg-white/5', 'text-white', 'border-white/10');
+                                const t = b.querySelector('.text-xs');
+                                if (t) t.classList.remove('text-black');
+                            });
+                            btn.classList.remove('bg-white/5', 'text-white', 'border-white/10');
+                            btn.classList.add('bg-white', 'text-black', 'border-white');
+                            const t = btn.querySelector('.text-xs');
+                            if (t) t.classList.add('text-black');
+                        } else {
+                            currentGoal = val;
+                            document.querySelectorAll('#matcher-goal .matcher-btn').forEach(b => {
+                                b.classList.remove('bg-white', 'text-black', 'border-white');
+                                b.classList.add('bg-white/5', 'text-white', 'border-white/10');
+                                const t = b.querySelector('.text-xs');
+                                if (t) t.classList.remove('text-black');
+                            });
+                            btn.classList.remove('bg-white/5', 'text-white', 'border-white/10');
+                            btn.classList.add('bg-white', 'text-black', 'border-white');
+                            const t = btn.querySelector('.text-xs');
+                            if (t) t.classList.add('text-black');
+                        }
+                        updateMatcherResult();
+                    }
+
+                    function updateMatcherResult() {
+                        const titleEl = document.getElementById('matcher-class-title');
+                        const descEl = document.getElementById('matcher-class-desc');
+
+                        if (currentGoal === 'drift') {
+                            if (currentDrive === 'rwd') {
+                                titleEl.textContent = 'Pro-Am Drift Battle';
+                                descEl.textContent = 'High-angle tandem drift competition with judged clipping points, speed sensors, and smoke elimination rounds.';
+                            } else if (currentDrive === 'awd') {
+                                titleEl.textContent = 'Gymkhana AWD Power-Slide Showcase';
+                                descEl.textContent = 'Ken Block-inspired high-torque 4-wheel power slides around tight obstacle courses and 360-donut boxes.';
+                            } else {
+                                titleEl.textContent = 'Exhibition Slide & Stunt Class';
+                                descEl.textContent = 'Demonstration runs showcasing car control, handbrake initiation, and exhibition style for the crowd.';
+                            }
+                        } else if (currentGoal === 'timeattack') {
+                            if (currentDrive === 'fwd') {
+                                titleEl.textContent = 'Autocross Street Tuner (FWD Apex)';
+                                descEl.textContent = 'Lightweight, rapid slalom competition optimizing turn-in bite, brake modulation, and precision cone clearance.';
+                            } else if (currentDrive === 'awd') {
+                                titleEl.textContent = 'Unlimited AWD Time Attack';
+                                descEl.textContent = 'Maximum mechanical grip and forced-induction launch control battling the clock on the full technical course.';
+                            } else {
+                                titleEl.textContent = 'Open Championship Autocross';
+                                descEl.textContent = 'Pure driving talent pitted against computerized timing beacons with zero margin for error.';
+                            }
+                        } else if (currentGoal === 'showcase') {
+                            titleEl.textContent = 'Avant-Garde Paddock & Supercar Showcase';
+                            descEl.textContent = 'Center-stage paddock display reserved for bespoke builds, clean aesthetics, exotic aero, and VIP guest engagement.';
+                        } else {
+                            titleEl.textContent = 'Krosskhana Rookie Track Academy';
+                            descEl.textContent = 'Hands-on track clinics led by veteran drivers: line selection, emergency braking, weight transfer, and safety certification.';
+                        }
+                    }
+
+                    // Auto-select initial state on load
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const firstDrive = document.querySelector('#matcher-drivetrain .matcher-btn');
+                        const firstGoal = document.querySelector('#matcher-goal .matcher-btn');
+                        if (firstDrive) selectMatcher('drive', 'rwd', firstDrive);
+                        if (firstGoal) selectMatcher('goal', 'drift', firstGoal);
+                    });
+                </script>
             </div>
         </div>
     </section>
@@ -1274,6 +1466,152 @@ try {
     </button>
 
     </div> <!-- End of main-app -->
+
+    <!-- Event Explanatory Modal -->
+    <div id="event-details-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md hidden transition-all duration-300">
+        <div class="relative bg-gradient-to-b from-gray-900 via-gray-950 to-black rounded-3xl shadow-2xl max-w-3xl w-full border border-white/20 overflow-hidden my-8 animate-fade-in-up">
+            <!-- Close Button -->
+            <button onclick="closeEventDetailsModal()" class="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center border border-white/20 backdrop-blur-md transition-all shadow-lg" title="Close">
+                <i class="fas fa-times text-base"></i>
+            </button>
+
+            <!-- Poster Hero Image Area -->
+            <div class="relative h-64 sm:h-80 bg-black overflow-hidden">
+                <img id="modal-event-img" src="" alt="Event Poster" class="w-full h-full object-cover filter brightness-90 contrast-110">
+                <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-black/30"></div>
+                
+                <div class="absolute top-4 left-4 flex flex-wrap gap-2 z-10">
+                    <span id="modal-event-badge" class="px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-white text-black shadow-lg"></span>
+                    <span id="modal-event-date" class="px-3 py-1 rounded-full text-xs font-semibold bg-black/70 text-white backdrop-blur-md border border-white/20"></span>
+                </div>
+
+                <div class="absolute bottom-4 left-6 right-6">
+                    <h2 id="modal-event-title" class="text-2xl sm:text-4xl font-black text-white font-orbitron tracking-tight drop-shadow-lg"></h2>
+                </div>
+            </div>
+
+            <!-- Modal Content & Explanatory Details -->
+            <div class="p-6 sm:p-8 space-y-6 max-h-[50vh] overflow-y-auto">
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2 font-orbitron">About The Event</h4>
+                    <p id="modal-event-desc" class="text-gray-300 text-sm sm:text-base leading-relaxed"></p>
+                </div>
+
+                <!-- Event Highlights Grid -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 font-orbitron">Key Attractions & Highlights</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                                <i class="fas fa-car-side"></i>
+                            </div>
+                            <span class="text-gray-200">High-Octane Autocross & Drifting</span>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                                <i class="fas fa-crown"></i>
+                            </div>
+                            <span class="text-gray-200">VIP Paddock & Pit Lane Access</span>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            <span class="text-gray-200">Curated Supercar & Tuner Showcase</span>
+                        </div>
+                        <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                                <i class="fas fa-music"></i>
+                            </div>
+                            <span class="text-gray-200">Live Sound Stage & Brand Activations</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Action Buttons -->
+            <div class="p-6 bg-black/80 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <a id="modal-event-full-page" href="event.php" class="text-xs sm:text-sm font-semibold text-gray-300 hover:text-white flex items-center gap-2 transition-colors">
+                    <span>View Dedicated Event Page</span>
+                    <i class="fas fa-arrow-right text-xs"></i>
+                </a>
+
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <button onclick="closeEventDetailsModal()" class="px-5 py-3 text-xs sm:text-sm font-semibold text-gray-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors">
+                        Close
+                    </button>
+                    <a id="modal-event-primary-cta" href="index.php#participate" class="flex-1 sm:flex-initial px-8 py-3 bg-gradient-to-r from-white to-gray-300 text-black font-black text-xs sm:text-sm rounded-xl shadow-lg hover:from-gray-100 hover:to-gray-400 transition-all text-center">
+                        Register Now
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Explanatory Modal & Gallery Controller Script -->
+    <script>
+        function openEventDetailsModal(eventData) {
+            if (!eventData) return;
+            const modal = document.getElementById('event-details-modal');
+            if (!modal) return;
+
+            document.getElementById('modal-event-img').src = eventData.image_url || 'pictures/1.png';
+            document.getElementById('modal-event-img').alt = eventData.title || 'Event';
+            document.getElementById('modal-event-badge').textContent = eventData.badge || (eventData.is_upcoming ? 'Upcoming Event' : 'Past Event');
+            document.getElementById('modal-event-date').innerHTML = `<i class="fas fa-calendar-alt mr-1.5"></i> ${eventData.date_text || 'Date TBA'}`;
+            document.getElementById('modal-event-title').textContent = eventData.title || '';
+            document.getElementById('modal-event-desc').textContent = eventData.description || '';
+
+            // Primary CTA link
+            const ctaBtn = document.getElementById('modal-event-primary-cta');
+            if (eventData.button_link && eventData.button_link.trim() !== '') {
+                ctaBtn.href = eventData.button_link;
+                ctaBtn.textContent = eventData.button_text || 'View Action';
+                ctaBtn.onclick = null;
+            } else if (eventData.is_upcoming) {
+                ctaBtn.href = '#participate';
+                ctaBtn.textContent = 'Register to Race';
+                ctaBtn.onclick = function() { closeEventDetailsModal(); };
+            } else {
+                ctaBtn.href = 'event.php?slug=' + encodeURIComponent(eventData.slug || '');
+                ctaBtn.textContent = 'Full Event Dossier';
+                ctaBtn.onclick = null;
+            }
+
+            // Dedicated full page link
+            const fullPageLink = document.getElementById('modal-event-full-page');
+            fullPageLink.href = 'event.php?slug=' + encodeURIComponent(eventData.slug || '');
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeEventDetailsModal() {
+            const modal = document.getElementById('event-details-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
+        function openEventGallery(slug) {
+            if (slug) {
+                window.location.href = 'event.php?slug=' + encodeURIComponent(slug);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('event-details-modal');
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) closeEventDetailsModal();
+                });
+            }
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeEventDetailsModal();
+            });
+        });
+    </script>
 
     <!-- Notification Modal -->
     <div id="notification-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 hidden">

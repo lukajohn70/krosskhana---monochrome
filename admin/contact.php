@@ -315,18 +315,25 @@ if ($pdo) {
             });
 
             fetch(`api/contact.php?${params}`)
-                .then(response => response.json())
+                .then(async response => {
+                    const text = await response.text();
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        throw new Error(text || 'Invalid server response');
+                    }
+                })
                 .then(data => {
                     if (data.status === 'success') {
                         renderContactsTable(data.data);
                         renderPagination(data.pagination);
                     } else {
-                        showError('Error loading contacts data');
+                        showError(data.message || 'Error loading contacts data');
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    showError('Error loading contacts data');
+                    console.error('Error loading contacts:', error);
+                    showError('Error loading contacts data: ' + error.message);
                 });
         }
 
@@ -450,74 +457,105 @@ if ($pdo) {
 
         function showContactModal(contact) {
             const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+            modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4';
             modal.id = 'contact-modal';
             
-            modal.innerHTML = `
-                <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-                    <div class="mt-3">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-medium text-gray-900">Contact Inquiry Details</h3>
-                            <button onclick="closeContactModal()" class="text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times text-xl"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Name</label>
-                                    <p class="mt-1 text-sm text-gray-900">${contact.name || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                                    <p class="mt-1 text-sm text-gray-900">${contact.email || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Subject</label>
-                                    <p class="mt-1 text-sm text-gray-900">${contact.subject || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Status</label>
-                                    <span class="mt-1 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${contact.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : contact.status === 'contacted' ? 'bg-blue-100 text-blue-800' : contact.status === 'resolved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                                        ${contact.status || 'N/A'}
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Message</label>
-                                <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">${contact.message || 'N/A'}</p>
-                            </div>
+            const initials = (contact.name || 'U').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+            const dateStr = contact.created_at ? new Date(contact.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
 
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Reply to Contact</label>
-                                <textarea id="reply-message" rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent" placeholder="Write your response to ${contact.name || 'this contact'}..."></textarea>
-                                <p class="mt-2 text-xs text-gray-500">This sends an email to ${contact.email || 'the contact email'} and updates inquiry status.</p>
+            modal.innerHTML = `
+                <div class="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 my-8">
+                    <!-- Header Banner -->
+                    <div class="bg-gradient-to-r from-gray-900 via-gray-800 to-black px-6 py-5 text-white flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center font-bold text-lg text-white border border-white/20">
+                                ${initials}
                             </div>
-                            
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Created At</label>
-                                <p class="mt-1 text-sm text-gray-900">${contact.created_at || 'N/A'}</p>
+                                <h3 class="text-xl font-bold text-white">${contact.name || 'Anonymous Inquiry'}</h3>
+                                <div class="flex items-center space-x-2 text-xs text-gray-300 mt-0.5">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full ${getStatusColor(contact.status)} font-medium">
+                                        ${contact.status || 'pending'}
+                                    </span>
+                                    <span>•</span>
+                                    <span>${dateStr}</span>
+                                    ${contact.inquiry_type ? `<span>•</span><span class="capitalize bg-white/10 px-2 py-0.5 rounded text-white">${contact.inquiry_type}</span>` : ''}
+                                </div>
                             </div>
-                            
-                            ${contact.updated_at ? `
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Last Updated</label>
-                                <p class="mt-1 text-sm text-gray-900">${contact.updated_at}</p>
-                            </div>
-                            ` : ''}
                         </div>
-                        
-                        <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                            <button onclick="sendContactReply(${contact.id}, false)" class="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-                                Send Reply
-                            </button>
-                            <button onclick="sendContactReply(${contact.id}, true)" class="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                Reply + Resolve
-                            </button>
-                            <button onclick="closeContactModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        <button onclick="closeContactModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                        <!-- Contact Action Bar -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div class="overflow-hidden">
+                                    <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Email Address</p>
+                                    <a href="mailto:${contact.email}" class="text-sm font-semibold text-blue-600 hover:underline truncate block">
+                                        ${contact.email || 'N/A'}
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                                    <i class="fas fa-phone"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Phone</p>
+                                    ${contact.phone ? `<a href="tel:${contact.phone}" class="text-sm font-semibold text-gray-800 hover:underline">${contact.phone}</a>` : `<span class="text-sm text-gray-400">Not provided</span>`}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Subject & Inquiry Content -->
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Subject</p>
+                            <h4 class="text-lg font-bold text-gray-900 pb-2">${contact.subject || 'No Subject'}</h4>
+                            <p class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Message</p>
+                            <div class="p-4 bg-gray-50 rounded-xl border border-gray-200 text-gray-800 text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                                ${contact.message || 'No message provided.'}
+                            </div>
+                        </div>
+
+                        <!-- Direct Reply Form -->
+                        <div class="pt-2 border-t border-gray-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-bold uppercase tracking-wider text-gray-600 flex items-center gap-1.5">
+                                    <i class="fas fa-reply text-gray-400"></i> Compose Reply via Email
+                                </label>
+                                <span class="text-xs text-gray-400">Sent directly to ${contact.email || 'recipient'}</span>
+                            </div>
+                            <textarea id="reply-message" rows="4" class="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-black focus:border-black transition-all" placeholder="Write your professional response to ${contact.name || 'the customer'}..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2">
+                            <label class="text-xs font-semibold text-gray-500">Status:</label>
+                            <select onchange="updateContactStatusQuick(${contact.id}, this.value)" class="text-xs font-semibold rounded-lg border-gray-300 py-1.5 px-2.5 bg-white text-gray-700">
+                                <option value="pending" ${contact.status === 'pending' ? 'selected' : ''}>Pending</option>
+                                <option value="contacted" ${contact.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+                                <option value="resolved" ${contact.status === 'resolved' ? 'selected' : ''}>Resolved</option>
+                                <option value="spam" ${contact.status === 'spam' ? 'selected' : ''}>Spam</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <button onclick="closeContactModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">
                                 Close
+                            </button>
+                            <button onclick="sendContactReply(${contact.id}, false)" class="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-black transition-colors flex items-center gap-1.5">
+                                <i class="fas fa-paper-plane text-xs"></i> Send Reply
+                            </button>
+                            <button onclick="sendContactReply(${contact.id}, true)" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1.5">
+                                <i class="fas fa-check-circle text-xs"></i> Reply & Resolve
                             </button>
                         </div>
                     </div>
@@ -532,6 +570,30 @@ if ($pdo) {
             if (modal) {
                 modal.remove();
             }
+        }
+
+        function updateContactStatusQuick(id, status) {
+            fetch('api/contact.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'update_status',
+                    id: id,
+                    status: status
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showSuccess('Status updated to ' + status);
+                    loadContactsData();
+                } else {
+                    showError(data.message || 'Failed to update status');
+                }
+            })
+            .catch(err => showError('Status update failed'));
         }
 
         function sendContactReply(id, markResolved = false) {

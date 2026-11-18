@@ -345,74 +345,87 @@ if ($pdo) {
             }
 
             // Render desktop table
-            desktopTbody.innerHTML = data.map(corporate => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${corporate.name}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${corporate.email}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${corporate.phone}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${corporate.company}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${corporate.proposal_type}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${corporate.created_at}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${corporate.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : corporate.status === 'contacted' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+            desktopTbody.innerHTML = data.map(corporate => {
+                const partnerTypes = [];
+                if (corporate.brand_collaboration == 1) partnerTypes.push('Brand Collab');
+                if (corporate.vendor_opportunities == 1) partnerTypes.push('Vendor');
+                if (corporate.media_representative == 1) partnerTypes.push('Media');
+                const partnerTypeBadge = partnerTypes.length > 0 ? partnerTypes.join(', ') : 'Partnership';
+
+                const statusColor = corporate.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    (corporate.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                                    (corporate.status === 'partnered' || corporate.status === 'qualified' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'));
+
+                const dateStr = corporate.created_at ? new Date(corporate.created_at).toLocaleDateString() : 'N/A';
+
+                return `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-bold text-gray-900">${corporate.company || 'N/A'}</div>
+                        <div class="text-xs text-gray-500">${corporate.contact_person || 'N/A'} ${corporate.role_title ? `• ${corporate.role_title}` : ''}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${corporate.email}</div>
+                        <div class="text-xs text-gray-500">${corporate.phone || ''}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-gray-100 text-gray-800 border border-gray-200">
+                            ${partnerTypeBadge}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${dateStr}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 text-xs font-bold rounded-full ${statusColor}">
                             ${corporate.status}
                         </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onclick="viewCorporate(${corporate.id})" class="text-gray-600 hover:text-gray-900 mr-2">
-                            <i class="fas fa-eye"></i>
+                        <button onclick="viewCorporate(${corporate.id})" class="text-gray-700 hover:text-black mr-3 font-semibold">
+                            <i class="fas fa-eye mr-1"></i> View
                         </button>
-                        <button onclick="deleteCorporate(${corporate.id})" class="text-red-600 hover:text-red-900">
+                        <button onclick="deleteCorporate(${corporate.id})" class="text-red-500 hover:text-red-700">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
 
             // Render mobile cards
-            mobileContainer.innerHTML = data.map(corporate => `
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+            mobileContainer.innerHTML = data.map(corporate => {
+                const partnerTypes = [];
+                if (corporate.brand_collaboration == 1) partnerTypes.push('Brand Collab');
+                if (corporate.vendor_opportunities == 1) partnerTypes.push('Vendor');
+                if (corporate.media_representative == 1) partnerTypes.push('Media');
+                const partnerTypeBadge = partnerTypes.length > 0 ? partnerTypes.join(', ') : 'Partnership';
+
+                const statusColor = corporate.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    (corporate.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                                    (corporate.status === 'partnered' || corporate.status === 'qualified' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'));
+
+                return `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
                     <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-user text-gray-600"></i>
-                            <span class="font-medium text-gray-900">${corporate.name}</span>
+                        <div>
+                            <h4 class="font-bold text-gray-900">${corporate.company || 'N/A'}</h4>
+                            <p class="text-xs text-gray-500">${corporate.contact_person || ''} ${corporate.role_title ? `(${corporate.role_title})` : ''}</p>
                         </div>
-                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${corporate.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : corporate.status === 'contacted' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
+                        <span class="px-2.5 py-0.5 text-xs font-bold rounded-full ${statusColor}">
                             ${corporate.status}
                         </span>
                     </div>
-                    <div class="space-y-2 text-sm text-gray-600">
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-envelope text-gray-500"></i>
-                            <span>${corporate.email}</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-phone text-gray-500"></i>
-                            <span>${corporate.phone}</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-building text-gray-500"></i>
-                            <span>${corporate.company}</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-file-alt text-gray-500"></i>
-                            <span>${corporate.proposal_type}</span>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <i class="fas fa-calendar text-gray-500"></i>
-                            <span>${corporate.created_at}</span>
-                        </div>
+                    <div class="space-y-1.5 text-xs text-gray-600 mb-3">
+                        <div><i class="fas fa-envelope w-4 text-gray-400"></i> ${corporate.email}</div>
+                        <div><i class="fas fa-phone w-4 text-gray-400"></i> ${corporate.phone}</div>
+                        <div><i class="fas fa-handshake w-4 text-gray-400"></i> ${partnerTypeBadge}</div>
                     </div>
-                    <div class="flex justify-end space-x-2 mt-3 pt-3 border-t border-gray-100">
-                        <button onclick="viewCorporate(${corporate.id})" class="text-gray-600 hover:text-gray-900">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button onclick="deleteCorporate(${corporate.id})" class="text-red-600 hover:text-red-900">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                    <div class="flex justify-end space-x-2 pt-2 border-t border-gray-100">
+                        <button onclick="viewCorporate(${corporate.id})" class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium">View Dossier</button>
+                        <button onclick="deleteCorporate(${corporate.id})" class="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-medium">Delete</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function renderPagination(pagination) {
@@ -489,77 +502,175 @@ if ($pdo) {
 
         function showCorporateModal(corporate) {
             const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+            modal.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4';
             modal.id = 'corporate-modal';
-            
+
+            const dateStr = corporate.created_at ? new Date(corporate.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
+            const statusColor = corporate.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                (corporate.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                                (corporate.status === 'partnered' || corporate.status === 'qualified' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'));
+
+            // Partnership type items
+            const partnerTypes = [];
+            if (corporate.brand_collaboration == 1) partnerTypes.push({ name: 'Brand Collaboration', icon: 'fas fa-handshake' });
+            if (corporate.vendor_opportunities == 1) partnerTypes.push({ name: 'Vendor Opportunities', icon: 'fas fa-store' });
+            if (corporate.media_representative == 1) partnerTypes.push({ name: 'Media Representation', icon: 'fas fa-camera' });
+
+            // Interests items
+            const interests = [];
+            if (corporate.event_integration == 1) interests.push('Event Integration');
+            if (corporate.product_showcase == 1) interests.push('Product Showcase');
+            if (corporate.brand_activation == 1) interests.push('Brand Activation');
+            if (corporate.content_collaboration == 1) interests.push('Content Collaboration');
+            if (corporate.rd_demonstration == 1) interests.push('R&D Demonstration');
+            if (corporate.other_interest == 1) interests.push(corporate.other_interest_text ? `Other: ${corporate.other_interest_text}` : 'Other');
+
             modal.innerHTML = `
-                <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-                    <div class="mt-3">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-lg font-medium text-gray-900">Corporate Inquiry Details</h3>
-                            <button onclick="closeCorporateModal()" class="text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times text-xl"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Name</label>
-                                    <p class="mt-1 text-sm text-gray-900">${corporate.name || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                                    <p class="mt-1 text-sm text-gray-900">${corporate.email || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Phone</label>
-                                    <p class="mt-1 text-sm text-gray-900">${corporate.phone || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Company</label>
-                                    <p class="mt-1 text-sm text-gray-900">${corporate.company || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Proposal Type</label>
-                                    <p class="mt-1 text-sm text-gray-900">${corporate.proposal_type || 'N/A'}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Status</label>
-                                    <span class="mt-1 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${corporate.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : corporate.status === 'contacted' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}">
-                                        ${corporate.status || 'N/A'}
+                <div class="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 my-8">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-gray-900 via-gray-800 to-black px-6 py-5 text-white flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center font-bold text-lg text-white border border-white/20">
+                                <i class="fas fa-building"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-white">${corporate.company || 'Corporate Partner'}</h3>
+                                <div class="flex items-center space-x-2 text-xs text-gray-300 mt-0.5">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full ${statusColor} font-bold">
+                                        ${corporate.status || 'pending'}
                                     </span>
+                                    <span>•</span>
+                                    <span>Received ${dateStr}</span>
                                 </div>
                             </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Message</label>
-                                <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">${corporate.message || 'N/A'}</p>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Created At</label>
-                                <p class="mt-1 text-sm text-gray-900">${corporate.created_at || 'N/A'}</p>
-                            </div>
-                            
-                            ${corporate.updated_at ? `
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Last Updated</label>
-                                <p class="mt-1 text-sm text-gray-900">${corporate.updated_at}</p>
-                            </div>
-                            ` : ''}
                         </div>
-                        
-                        <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-                            <button onclick="closeCorporateModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
-                                Close
+                        <button onclick="closeCorporateModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+                        <!-- Key Contact Details -->
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">Key Representative</h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium">Contact Person</p>
+                                    <p class="text-sm font-bold text-gray-900">${corporate.contact_person || 'N/A'}</p>
+                                    ${corporate.role_title ? `<p class="text-xs text-gray-500 mt-0.5">${corporate.role_title}</p>` : ''}
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium">Email Address</p>
+                                    <a href="mailto:${corporate.email}" class="text-sm font-semibold text-blue-600 hover:underline block truncate">
+                                        ${corporate.email}
+                                    </a>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium">Phone</p>
+                                    <a href="tel:${corporate.phone}" class="text-sm font-semibold text-gray-900 hover:underline">
+                                        ${corporate.phone || 'N/A'}
+                                    </a>
+                                </div>
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium">Website / Social</p>
+                                    ${corporate.website_social ? `
+                                        <a href="${corporate.website_social.startsWith('http') ? corporate.website_social : 'https://' + corporate.website_social}" target="_blank" class="text-sm font-semibold text-blue-600 hover:underline truncate block flex items-center gap-1">
+                                            <span>${corporate.website_social}</span>
+                                            <i class="fas fa-external-link-alt text-xs"></i>
+                                        </a>
+                                    ` : '<p class="text-sm text-gray-400">None provided</p>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Partnership Types -->
+                        <div>
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Partnership Type</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${partnerTypes.length > 0 ? partnerTypes.map(t => `
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold shadow-sm">
+                                        <i class="${t.icon}"></i> ${t.name}
+                                    </span>
+                                `).join('') : '<span class="text-sm text-gray-400">No type specified</span>'}
+                            </div>
+                        </div>
+
+                        <!-- Primary Interests -->
+                        <div>
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Areas of Interest</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${interests.length > 0 ? interests.map(int => `
+                                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 text-xs font-semibold">
+                                        <i class="fas fa-check-circle text-blue-500 mr-1.5"></i> ${int}
+                                    </span>
+                                `).join('') : '<span class="text-sm text-gray-400">No interests specified</span>'}
+                            </div>
+                        </div>
+
+                        <!-- Admin Notes -->
+                        <div class="pt-2 border-t border-gray-100">
+                            <label class="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2 block">Internal Notes</label>
+                            <textarea id="corp-admin-notes" rows="3" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-black focus:border-black" placeholder="Add internal team notes about this partnership discussion...">${corporate.admin_notes || ''}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center space-x-2">
+                            <label class="text-xs font-semibold text-gray-500">Status:</label>
+                            <select id="corp-status-select" class="text-xs font-semibold rounded-lg border-gray-300 py-1.5 px-2.5 bg-white text-gray-700">
+                                <option value="pending" ${corporate.status === 'pending' ? 'selected' : ''}>Pending</option>
+                                <option value="contacted" ${corporate.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+                                <option value="qualified" ${corporate.status === 'qualified' || corporate.status === 'partnered' ? 'selected' : ''}>Qualified / Partnered</option>
+                                <option value="rejected" ${corporate.status === 'rejected' || corporate.status === 'declined' ? 'selected' : ''}>Declined</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+                            <a href="mailto:${corporate.email}?subject=Krosskhana%20Partnership%20Discussion" class="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5">
+                                <i class="fas fa-envelope"></i> Email Partner
+                            </a>
+                            <button onclick="saveCorporateStatusAndNotes(${corporate.id})" class="px-4 py-2 text-xs font-bold text-white bg-black rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-1.5">
+                                <i class="fas fa-save"></i> Save Changes
                             </button>
                         </div>
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(modal);
+        }
+
+        function saveCorporateStatusAndNotes(id) {
+            const status = document.getElementById('corp-status-select').value;
+            const notes = document.getElementById('corp-admin-notes').value;
+            
+            showLoading('Saving changes...');
+            fetch('api/corporate.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update_status',
+                    id: id,
+                    status: status,
+                    admin_notes: notes
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                hideLoading();
+                if (data.status === 'success') {
+                    showSuccess('Inquiry updated successfully');
+                    closeCorporateModal();
+                    loadData();
+                } else {
+                    showError(data.message || 'Failed to update');
+                }
+            })
+            .catch(err => {
+                hideLoading();
+                showError('Failed to save changes');
+            });
         }
 
         function closeCorporateModal() {

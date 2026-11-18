@@ -19,6 +19,9 @@ $stats = [
 
 if ($pdo) {
     try {
+        if (function_exists('ensureCoreTables')) {
+            ensureCoreTables($pdo);
+        }
         $stmt = $pdo->query("SELECT 
             COUNT(*) as total,
             COUNT(CASE WHEN is_active = 1 THEN 1 END) as active,
@@ -37,263 +40,245 @@ if ($pdo) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Explore Section Management - Krosskhana Admin</title>
+    <title>Explore Section - Krosskhana Admin</title>
     <link rel="icon" type="image/png" href="../assets/logos/Krosskhana-05.png">
     
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { 
-                        poppins: ['Poppins', 'sans-serif'],
-                        orbitron: ['Orbitron', 'sans-serif']
-                    },
-                    colors: {
-                        dark: {
-                            50: '#f8fafc',
-                            800: '#1e293b',
-                            900: '#0f172a',
-                            950: '#020617'
-                        }
-                    }
+                    fontFamily: { poppins: ['Poppins', 'sans-serif'], orbitron: ['Orbitron', 'monospace'] }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-dark-950 text-white font-poppins min-h-screen">
-    <div class="flex h-screen overflow-hidden">
-        <!-- Sidebar Navigation -->
-        <?php include __DIR__ . '/includes/sidebar.php'; ?>
+<body class="bg-gray-50 min-h-screen font-poppins">
+    <?php $pageTitle = 'Explore Showcase'; ?>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
-        <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col overflow-y-auto">
-            <!-- Top Bar -->
-            <header class="border-b border-gray-800 bg-dark-900/60 backdrop-blur-md sticky top-0 z-20 px-6 py-4 flex items-center justify-between">
-                <div>
-                    <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                        <i class="fas fa-compass text-gray-400"></i> Explore Section Management
-                    </h1>
-                    <p class="text-xs text-gray-400">Manage 'EXPLORE THE WORLD OF KROSSKHANA' cards and hover showcases</p>
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300"></div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Cards</dt>
+                <dd id="stat-total" class="text-3xl font-extrabold text-gray-900 mt-1"><?php echo $stats['total']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-gray-800 to-gray-700 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-compass"></i>
+            </div>
+        </div>
+
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Slide 1 Cards</dt>
+                <dd id="stat-s1" class="text-3xl font-extrabold text-indigo-600 mt-1"><?php echo $stats['slide_1']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-blue-500 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-layer-group"></i>
+            </div>
+        </div>
+
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-purple-600 uppercase tracking-wider">Slide 2 Cards</dt>
+                <dd id="stat-s2" class="text-3xl font-extrabold text-purple-600 mt-1"><?php echo $stats['slide_2']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-purple-600 to-pink-500 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-clone"></i>
+            </div>
+        </div>
+
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Active Status</dt>
+                <dd id="stat-active" class="text-3xl font-extrabold text-emerald-600 mt-1"><?php echo $stats['active']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-check-circle"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="bg-white shadow-sm rounded-2xl border border-gray-200/80 overflow-hidden mb-8">
+        <!-- Toolbar Header -->
+        <div class="p-5 sm:p-6 border-b border-gray-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-compass text-gray-700"></i> Explore the World of Krosskhana
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">Manage the cards, icons, descriptions, and hover popups displayed in the homepage carousel.</p>
+            </div>
+            <div>
+                <button onclick="openCreateModal()" class="bg-gradient-to-r from-gray-900 to-black hover:from-gray-800 hover:to-gray-900 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow hover:shadow-md transition-all flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Add Explore Card
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="p-6">
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="py-16 text-center text-gray-500">
+                <i class="fas fa-circle-notch fa-spin text-3xl mb-3 text-gray-700"></i>
+                <p class="text-sm font-medium">Loading explore items...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden py-16 text-center">
+                <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4 text-gray-400 text-2xl">
+                    <i class="fas fa-compass"></i>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="openCreateModal()" class="px-4 py-2 bg-gradient-to-r from-white to-gray-200 text-black font-semibold rounded-xl text-xs hover:from-gray-100 hover:to-gray-300 transition shadow-lg flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Add Explore Card
-                    </button>
-                </div>
-            </header>
+                <h3 class="text-base font-bold text-gray-900">No explore cards found</h3>
+                <p class="text-xs text-gray-500 max-w-sm mx-auto mt-1 mb-5">Click below to add cards to the Explore section.</p>
+                <button onclick="openCreateModal()" class="px-4 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-xl shadow transition">
+                    <i class="fas fa-plus mr-1"></i> Add First Card
+                </button>
+            </div>
 
-            <main class="p-6 space-y-6 max-w-7xl mx-auto w-full">
-                <!-- Toast Notification -->
-                <div id="toast" class="hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300"></div>
-
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Total Cards</span>
-                            <div class="text-xl font-bold text-white mt-1" id="stat-total"><?php echo $stats['total']; ?></div>
-                        </div>
-                        <div class="w-10 h-10 rounded-xl bg-gray-800/80 flex items-center justify-center text-gray-300 border border-gray-700/50">
-                            <i class="fas fa-th-large"></i>
-                        </div>
-                    </div>
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-medium text-emerald-400 uppercase tracking-wider">Active</span>
-                            <div class="text-xl font-bold text-emerald-400 mt-1" id="stat-active"><?php echo $stats['active']; ?></div>
-                        </div>
-                        <div class="w-10 h-10 rounded-xl bg-emerald-950/40 flex items-center justify-center text-emerald-400 border border-emerald-800/50">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Slide 1 Cards</span>
-                            <div class="text-xl font-bold text-white mt-1" id="stat-slide1"><?php echo $stats['slide_1']; ?></div>
-                        </div>
-                        <div class="w-10 h-10 rounded-xl bg-gray-800/80 flex items-center justify-center text-gray-300 border border-gray-700/50">
-                            <span class="text-xs font-bold font-orbitron">S1</span>
-                        </div>
-                    </div>
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-4 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-[11px] font-medium text-gray-400 uppercase tracking-wider">Slide 2 Cards</span>
-                            <div class="text-xl font-bold text-white mt-1" id="stat-slide2"><?php echo $stats['slide_2']; ?></div>
-                        </div>
-                        <div class="w-10 h-10 rounded-xl bg-gray-800/80 flex items-center justify-center text-gray-300 border border-gray-700/50">
-                            <span class="text-xs font-bold font-orbitron">S2</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Explore Items Grid -->
-                <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-6 backdrop-blur-xl">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-layer-group text-gray-400"></i> Cards on Homepage
-                        </h2>
-                        <span class="text-xs text-gray-500">Each slide holds 3 cards on the desktop carousel</span>
-                    </div>
-
-                    <!-- Loading State -->
-                    <div id="loading-spinner" class="py-16 text-center text-gray-400">
-                        <i class="fas fa-circle-notch fa-spin text-3xl mb-3 text-white"></i>
-                        <p class="text-sm">Loading explore items...</p>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div id="empty-state" class="hidden py-16 text-center text-gray-400">
-                        <div class="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4 text-gray-500 text-2xl">
-                            <i class="fas fa-compass"></i>
-                        </div>
-                        <h3 class="text-base font-semibold text-white">No explore cards yet</h3>
-                        <p class="text-xs text-gray-500 max-w-sm mx-auto mt-1 mb-4">Click below to add your first explore card.</p>
-                        <button onclick="openCreateModal()" class="px-4 py-2 bg-gradient-to-r from-white to-gray-200 text-black font-semibold rounded-xl text-xs hover:from-gray-100 hover:to-gray-300 transition">
-                            <i class="fas fa-plus mr-1"></i> Add Explore Card
-                        </button>
-                    </div>
-
-                    <!-- Cards Grid -->
-                    <div id="explore-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-                </div>
-            </main>
+            <!-- Explore Grid -->
+            <div id="explore-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
     </div>
 
     <!-- Add / Edit Modal -->
-    <div id="explore-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-dark-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative my-8">
-            <div class="flex items-center justify-between pb-4 border-b border-gray-800 mb-6">
-                <h3 id="modal-title" class="text-base font-bold text-white flex items-center gap-2">
-                    <i class="fas fa-plus text-gray-400"></i> Add Explore Card
+    <div id="explore-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white border border-gray-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative my-8">
+            <div class="flex items-center justify-between pb-4 border-b border-gray-200 mb-5">
+                <h3 id="modal-title" class="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-plus-circle text-gray-700"></i> Add Explore Card
                 </h3>
-                <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-white transition">
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 p-1">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
 
-            <form id="explore-form" onsubmit="handleExploreSubmit(event)" enctype="multipart/form-data" class="space-y-4">
+            <form id="explore-form" onsubmit="handleFormSubmit(event)" enctype="multipart/form-data" class="space-y-4">
                 <input type="hidden" name="action" id="form-action" value="create">
-                <input type="hidden" name="id" id="explore-id" value="">
-                <input type="hidden" name="remove_image" id="remove-image-flag" value="0">
+                <input type="hidden" name="id" id="form-id" value="">
                 <input type="hidden" name="modal_image_url" id="inp-modal-image-url" value="">
+                <input type="hidden" name="remove_image" id="inp-remove-image" value="0">
 
-                <!-- Title & Slide -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Card Heading <span class="text-red-400">*</span></label>
-                        <input type="text" name="title" id="inp-title" required placeholder="e.g. Autocross & Drifting Competitions" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-gray-500">
-                    </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Title -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Carousel Slide</label>
-                        <select name="slide_number" id="inp-slide" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gray-500">
-                            <option value="1">Slide 1 (First 3 cards)</option>
-                            <option value="2">Slide 2 (Next 3 cards)</option>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Card Title <span class="text-red-500">*</span></label>
+                        <input type="text" name="title" id="inp-title" required placeholder="e.g. Autocross & Drifting" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                    </div>
+
+                    <!-- Slide Assignment -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Carousel Slide</label>
+                        <select name="slide_number" id="inp-slide" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                            <option value="1">Slide 1 (First Set)</option>
+                            <option value="2">Slide 2 (Second Set)</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Main Card Description -->
+                <!-- Card Description -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-300 mb-1.5">Card Text (Front Display) <span class="text-red-400">*</span></label>
-                    <textarea name="description" id="inp-desc" rows="2" required placeholder="Experience the raw thrill and precision of authentic racing..." class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-gray-500"></textarea>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Card Brief Description <span class="text-red-500">*</span></label>
+                    <textarea name="description" id="inp-desc" rows="2" required placeholder="Brief tagline shown on the card face..." class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition"></textarea>
                 </div>
 
-                <!-- Hover Overlay Showcase Section -->
-                <div class="p-4 bg-dark-950/60 rounded-xl border border-gray-800 space-y-4">
-                    <h4 class="text-xs font-semibold text-white uppercase tracking-wider flex items-center gap-1.5">
-                        <i class="fas fa-eye text-gray-400"></i> Hover Showcase Popup Details
-                    </h4>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Hover Modal Section -->
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                    <span class="text-xs font-bold text-gray-700 uppercase tracking-wider block">Hover Preview Modal Details</span>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-300 mb-1">Hover Title</label>
-                            <input type="text" name="modal_title" id="inp-modal-title" placeholder="e.g. Racing Excellence" class="w-full bg-dark-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Hover Popup Title</label>
+                            <input type="text" name="modal_title" id="inp-modal-title" placeholder="e.g. Racing Excellence" class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-300 mb-1">Hover Subtitle / Tag</label>
-                            <input type="text" name="subtitle" id="inp-subtitle" placeholder="e.g. Racing Action" class="w-full bg-dark-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">Hover Popup Description</label>
+                            <input type="text" name="modal_description" id="inp-modal-desc" placeholder="Expanded explanation on hover..." class="w-full bg-white border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
                         </div>
                     </div>
 
+                    <!-- Image Upload -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">Hover Description</label>
-                        <textarea name="modal_description" id="inp-modal-desc" rows="2" placeholder="Longer description shown on hover..." class="w-full bg-dark-900 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white"></textarea>
-                    </div>
-
-                    <!-- Showcase Image -->
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">Hover Image / Poster</label>
-                        <div class="border border-dashed border-gray-800 rounded-xl p-3 text-center cursor-pointer hover:border-gray-600 transition bg-dark-900/60" onclick="document.getElementById('file-input').click()">
-                            <input type="file" name="image_file" id="file-input" accept="image/*" class="hidden" onchange="previewImage(this)">
-                            <div id="upload-placeholder" class="py-2">
-                                <i class="fas fa-image text-gray-500 text-lg mb-1"></i>
-                                <p class="text-[11px] text-gray-400">Click to upload showcase photo (e.g. pictures/1.png)</p>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Showcase Photo</label>
+                        <div id="upload-box" class="border-2 border-dashed border-gray-300 hover:border-gray-500 rounded-xl p-3 text-center cursor-pointer transition bg-white relative" onclick="document.getElementById('file-input').click()">
+                            <input type="file" name="image_file" id="file-input" accept="image/*" class="hidden" onchange="previewUpload(this)">
+                            
+                            <div id="upload-placeholder" class="py-1">
+                                <i class="fas fa-image text-xl text-gray-400 mb-1"></i>
+                                <p class="text-xs text-gray-600 font-medium">Click to upload showcase photo</p>
                             </div>
-                            <div id="upload-preview-box" class="hidden items-center justify-between gap-3 p-1">
-                                <img id="preview-img" src="" class="h-16 w-24 object-cover rounded-lg border border-gray-700">
-                                <span class="text-xs text-gray-300 truncate" id="preview-filename">Image selected</span>
-                                <button type="button" onclick="clearImage(event)" class="text-xs text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+
+                            <div id="upload-preview-box" class="hidden flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <img id="preview-img" src="" alt="Preview" class="w-12 h-12 rounded-lg object-cover border border-gray-300">
+                                    <span id="preview-filename" class="text-xs font-medium text-gray-700">Photo selected</span>
+                                </div>
+                                <button type="button" onclick="clearPhoto(event)" class="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 bg-red-50 rounded-lg">
+                                    Remove
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Icon and Gradient Row -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Icon -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Front Card Icon</label>
-                        <select name="icon_class" id="inp-icon" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gray-500">
-                            <option value="fas fa-car-side">Race Car (fas fa-car-side)</option>
-                            <option value="fas fa-microscope">Innovation / Tech (fas fa-microscope)</option>
-                            <option value="fas fa-music">Music / Entertainment (fas fa-music)</option>
-                            <option value="fas fa-tshirt">Fashion / Apparel (fas fa-tshirt)</option>
-                            <option value="fas fa-heart">Heart / Loyalty (fas fa-heart)</option>
-                            <option value="fas fa-crown">Crown / Premium (fas fa-crown)</option>
-                            <option value="fas fa-flag-checkered">Checkered Flag (fas fa-flag-checkered)</option>
-                            <option value="fas fa-trophy">Trophy (fas fa-trophy)</option>
-                            <option value="fas fa-bolt">High Voltage / Drift (fas fa-bolt)</option>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Icon</label>
+                        <select name="icon_class" id="inp-icon" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                            <option value="fas fa-car-side">🏎️ Car Side (Racing)</option>
+                            <option value="fas fa-microscope">🔬 Microscope (R&D)</option>
+                            <option value="fas fa-music">🎵 Music (Lifestyle)</option>
+                            <option value="fas fa-tshirt">👕 T-Shirt (Fashion)</option>
+                            <option value="fas fa-heart">❤️ Heart (Community)</option>
+                            <option value="fas fa-crown">👑 Crown (High-End)</option>
+                            <option value="fas fa-flag-checkered">🏁 Checkered Flag</option>
+                            <option value="fas fa-trophy">🏆 Trophy</option>
                         </select>
                     </div>
+
+                    <!-- Gradient Theme -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Card Gradient Styling</label>
-                        <select name="gradient_theme" id="inp-gradient" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gray-500">
-                            <option value="from-white to-gray-300">White &rarr; Gray (Silver Accent)</option>
-                            <option value="from-gray-300 to-white">Gray &rarr; White (Reverse Silver)</option>
-                            <option value="from-gray-700 to-gray-900">Carbon Gray</option>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Card Accent</label>
+                        <select name="gradient_theme" id="inp-gradient" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                            <option value="from-white to-gray-300">Monochrome Silver</option>
+                            <option value="from-gray-300 to-white">Inverted Silver</option>
+                            <option value="from-gray-900 to-black">Carbon Black</option>
+                            <option value="from-red-600 to-gray-900">Crimson Drift</option>
                         </select>
+                    </div>
+
+                    <!-- Sort Order -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Sort Order</label>
+                        <input type="number" name="sort_order" id="inp-sort" value="0" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
                     </div>
                 </div>
 
-                <!-- Order and Active -->
-                <div class="grid grid-cols-2 gap-4 pt-2">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">Display Priority Order</label>
-                        <input type="number" name="sort_order" id="inp-sort" value="1" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
-                        <span class="text-[10px] text-gray-500">1 to 6</span>
-                    </div>
-                    <div class="flex items-center justify-between pt-5">
-                        <span class="text-xs font-semibold text-white">Visible on Website</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="is_active" id="inp-active" value="1" checked class="sr-only peer">
-                            <div class="w-10 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                        </label>
-                    </div>
+                <!-- Active Toggle -->
+                <div class="flex items-center gap-3 pt-2">
+                    <input type="checkbox" name="is_active" id="inp-active" value="1" checked class="w-4 h-4 rounded text-gray-900 focus:ring-gray-700 border-gray-300">
+                    <label for="inp-active" class="text-xs font-semibold text-gray-800">
+                        Visible in public carousel
+                    </label>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-800 mt-6">
-                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-700 hover:border-gray-600 text-gray-300 rounded-xl text-xs font-medium hover:bg-gray-800/40 transition">
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-semibold text-gray-700 transition">
                         Cancel
                     </button>
-                    <button type="submit" id="btn-submit" class="px-5 py-2 bg-gradient-to-r from-white to-gray-200 text-black font-semibold rounded-xl text-xs hover:from-gray-100 hover:to-gray-300 transition shadow">
-                        <span id="btn-submit-text">Save Explore Card</span>
+                    <button type="submit" id="btn-submit" class="px-5 py-2 bg-gradient-to-r from-gray-900 to-black text-white hover:from-gray-800 hover:to-gray-900 rounded-xl text-xs font-semibold shadow transition flex items-center gap-2">
+                        <span id="btn-submit-text">Save Card</span>
                     </button>
                 </div>
             </form>
@@ -301,22 +286,39 @@ if ($pdo) {
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-dark-900 border border-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
-            <div class="w-12 h-12 rounded-full bg-red-950/50 text-red-400 flex items-center justify-center mx-auto mb-3 border border-red-800/40 text-xl">
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white border border-gray-200 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
+            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-xl">
                 <i class="fas fa-trash-alt"></i>
             </div>
-            <h4 class="text-base font-bold text-white mb-1">Delete Explore Card</h4>
-            <p class="text-xs text-gray-400 mb-6">Are you sure you want to remove <strong id="delete-name" class="text-white">this card</strong>?</p>
-            <div class="flex items-center justify-center gap-3">
-                <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 border border-gray-700 text-gray-300 rounded-xl text-xs">Cancel</button>
-                <button type="button" id="confirm-delete-btn" onclick="executeDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-xs shadow">Delete</button>
+            <h3 class="text-base font-bold text-gray-900 mb-1">Delete Explore Card?</h3>
+            <p class="text-xs text-gray-500 mb-5">This action will remove this card from the public homepage.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-semibold text-gray-700 transition">
+                    Cancel
+                </button>
+                <button onclick="executeDelete()" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition">
+                    Confirm Delete
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script>
         let deleteItemId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadExplore();
+        });
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-semibold transition-all duration-300 ${type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`;
+            toast.classList.remove('hidden');
+            setTimeout(() => { toast.classList.add('hidden'); }, 3500);
+        }
 
         function loadExplore() {
             document.getElementById('loading-spinner').classList.remove('hidden');
@@ -324,91 +326,100 @@ if ($pdo) {
             document.getElementById('empty-state').classList.add('hidden');
 
             fetch('api/explore.php')
-                .then(res => res.json())
+                .then(async res => {
+                    const text = await res.text();
+                    try { return JSON.parse(text); } catch (e) { throw new Error(text.replace(/<[^>]+>/g, '').trim() || `Error ${res.status}`); }
+                })
                 .then(data => {
                     document.getElementById('loading-spinner').classList.add('hidden');
                     if (data.status === 'success') {
                         if (data.stats) {
-                            document.getElementById('stat-total').innerText = data.stats.total;
-                            document.getElementById('stat-active').innerText = data.stats.active_count;
-                            document.getElementById('stat-slide1').innerText = data.stats.slide_1_count;
-                            document.getElementById('stat-slide2').innerText = data.stats.slide_2_count;
+                            document.getElementById('stat-total').innerText = data.stats.total || 0;
+                            document.getElementById('stat-s1').innerText = data.stats.slide_1 || 0;
+                            document.getElementById('stat-s2').innerText = data.stats.slide_2 || 0;
+                            document.getElementById('stat-active').innerText = data.stats.active || 0;
                         }
-
-                        if (!data.data || data.data.length === 0) {
-                            document.getElementById('empty-state').classList.remove('hidden');
-                        } else {
-                            renderExploreGrid(data.data);
-                        }
+                        renderCards(data.data || []);
                     } else {
-                        showToast(data.message || 'Error loading explore items', 'error');
+                        showToast(data.message || 'Error loading explore data', 'error');
                     }
                 })
                 .catch(err => {
                     document.getElementById('loading-spinner').classList.add('hidden');
-                    console.error('Fetch error:', err);
+                    console.error('Fetch explore error:', err);
                     showToast('Failed to load explore data', 'error');
                 });
         }
 
-        function renderExploreGrid(items) {
-            const grid = document.getElementById('explore-grid');
-            grid.innerHTML = items.map(item => {
-                const statusBadge = item.is_active == 1 
-                    ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">Active</span>`
-                    : `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-800 text-gray-400 border border-gray-700">Hidden</span>`;
+        function renderCards(items) {
+            const container = document.getElementById('explore-grid');
+            const emptyState = document.getElementById('empty-state');
+            container.innerHTML = '';
 
-                const slideBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-800 text-gray-300 border border-gray-700">Slide ${item.slide_number}</span>`;
+            if (!items || items.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
 
-                return `
-                    <div class="bg-dark-950/70 border border-gray-800 rounded-2xl p-6 relative flex flex-col hover:border-gray-700 transition">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="w-12 h-12 bg-gradient-to-r ${escapeHtml(item.gradient_theme || 'from-white to-gray-300')} rounded-xl flex items-center justify-center text-black text-xl shadow">
-                                <i class="${escapeHtml(item.icon_class || 'fas fa-car-side')}"></i>
+            container.classList.remove('hidden');
+            items.forEach(it => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between";
+
+                const statusBadge = it.is_active == 1 
+                    ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Active</span>`
+                    : `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600">Hidden</span>`;
+
+                const slideBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">Slide ${it.slide_number}</span>`;
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gray-900 text-white flex items-center justify-center text-xl shadow-sm">
+                                <i class="${it.icon_class || 'fas fa-car-side'}"></i>
                             </div>
-                            <div class="flex items-center gap-1.5">${slideBadge} ${statusBadge}</div>
-                        </div>
-
-                        <h4 class="text-base font-bold text-white mb-2">${escapeHtml(item.title)}</h4>
-                        <p class="text-xs text-gray-400 line-clamp-2 leading-relaxed mb-4">${escapeHtml(item.description)}</p>
-
-                        ${item.modal_title || item.modal_image_url ? `
-                        <div class="mb-4 p-3 bg-dark-900/80 rounded-xl border border-gray-800/80 flex items-center gap-3">
-                            ${item.modal_image_url ? `<img src="../${escapeHtml(item.modal_image_url)}" class="w-12 h-12 object-cover rounded-lg border border-gray-700">` : ''}
-                            <div class="overflow-hidden">
-                                <span class="block text-[11px] font-semibold text-gray-300 truncate">Hover: ${escapeHtml(item.modal_title || 'Showcase')}</span>
-                                <span class="block text-[10px] text-gray-500 truncate">${escapeHtml(item.modal_description || 'View popup preview')}</span>
-                            </div>
-                        </div>` : ''}
-
-                        <div class="mt-auto pt-4 border-t border-gray-800/80 w-full flex items-center justify-between">
-                            <span class="text-[11px] text-gray-500">Order: ${item.sort_order}</span>
                             <div class="flex items-center gap-1.5">
-                                <button onclick="toggleStatus(${item.id})" title="${item.is_active == 1 ? 'Hide on website' : 'Show on website'}" class="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/60 text-xs">
-                                    <i class="fas ${item.is_active == 1 ? 'fa-eye' : 'fa-eye-slash'}"></i>
-                                </button>
-                                <button onclick="openEditModal(${item.id})" title="Edit card" class="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/60 text-xs">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="openDeleteModal(${item.id}, '${escapeJs(item.title)}')" title="Delete card" class="p-2 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-950/30 text-xs">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
+                                ${slideBadge}
+                                ${statusBadge}
                             </div>
+                        </div>
+                        <h3 class="text-base font-bold text-gray-900">${it.title}</h3>
+                        <p class="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">${it.description}</p>
+                        
+                        ${it.modal_title ? `
+                            <div class="mt-3 p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-[11px] text-gray-600">
+                                <span class="font-bold text-gray-800 block">Hover Popup: ${it.modal_title}</span>
+                                <span class="text-gray-500 line-clamp-2">${it.modal_description || ''}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between">
+                        <button onclick="toggleStatus(${it.id})" class="text-xs font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                            <i class="fas fa-power-off text-xs ${it.is_active == 1 ? 'text-emerald-500' : 'text-gray-400'}"></i>
+                            <span>${it.is_active == 1 ? 'Hide' : 'Publish'}</span>
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openEditModal(${it.id})" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded-lg transition">
+                                <i class="fas fa-edit mr-1"></i> Edit
+                            </button>
+                            <button onclick="openDeleteModal(${it.id})" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                         </div>
                     </div>
                 `;
-            }).join('');
-            grid.classList.remove('hidden');
+                container.appendChild(card);
+            });
         }
 
         function openCreateModal() {
-            document.getElementById('explore-form').reset();
+            document.getElementById('modal-title').innerHTML = '<i class="fas fa-plus-circle text-gray-700"></i> Add Explore Card';
             document.getElementById('form-action').value = 'create';
-            document.getElementById('explore-id').value = '';
-            document.getElementById('modal-title').innerHTML = '<i class="fas fa-plus text-gray-400"></i> Add Explore Card';
-            document.getElementById('btn-submit-text').innerText = 'Add Card';
-            document.getElementById('inp-active').checked = true;
-            document.getElementById('remove-image-flag').value = '0';
+            document.getElementById('form-id').value = '';
+            document.getElementById('explore-form').reset();
+            document.getElementById('inp-modal-image-url').value = '';
+            document.getElementById('inp-remove-image').value = '0';
             document.getElementById('upload-placeholder').classList.remove('hidden');
             document.getElementById('upload-preview-box').classList.add('hidden');
             document.getElementById('explore-modal').classList.remove('hidden');
@@ -416,27 +427,31 @@ if ($pdo) {
 
         function openEditModal(id) {
             fetch(`api/explore.php?id=${id}`)
-                .then(res => res.json())
+                .then(async res => {
+                    const text = await res.text();
+                    try { return JSON.parse(text); } catch (e) { throw new Error(text.replace(/<[^>]+>/g, '').trim() || `Error ${res.status}`); }
+                })
                 .then(data => {
                     if (data.status === 'success') {
                         const it = data.data;
+                        document.getElementById('modal-title').innerHTML = '<i class="fas fa-edit text-gray-700"></i> Edit Explore Card';
                         document.getElementById('form-action').value = 'update';
-                        document.getElementById('explore-id').value = it.id;
+                        document.getElementById('form-id').value = it.id;
                         document.getElementById('inp-title').value = it.title || '';
-                        document.getElementById('inp-subtitle').value = it.subtitle || '';
                         document.getElementById('inp-desc').value = it.description || '';
                         document.getElementById('inp-modal-title').value = it.modal_title || '';
                         document.getElementById('inp-modal-desc').value = it.modal_description || '';
                         document.getElementById('inp-icon').value = it.icon_class || 'fas fa-car-side';
                         document.getElementById('inp-gradient').value = it.gradient_theme || 'from-white to-gray-300';
                         document.getElementById('inp-slide').value = it.slide_number || 1;
-                        document.getElementById('inp-sort').value = it.sort_order || 1;
-                        document.getElementById('inp-active').checked = (it.is_active == 1);
+                        document.getElementById('inp-sort').value = it.sort_order || 0;
+                        document.getElementById('inp-active').checked = it.is_active == 1;
                         document.getElementById('inp-modal-image-url').value = it.modal_image_url || '';
-                        document.getElementById('remove-image-flag').value = '0';
+                        document.getElementById('inp-remove-image').value = '0';
 
-                        if (it.modal_image_url && it.modal_image_url.trim() !== '') {
+                        if (it.modal_image_url) {
                             document.getElementById('preview-img').src = '../' + it.modal_image_url;
+                            document.getElementById('preview-filename').innerText = 'Current photo attached';
                             document.getElementById('upload-placeholder').classList.add('hidden');
                             document.getElementById('upload-preview-box').classList.remove('hidden');
                         } else {
@@ -444,12 +459,14 @@ if ($pdo) {
                             document.getElementById('upload-preview-box').classList.add('hidden');
                         }
 
-                        document.getElementById('modal-title').innerHTML = '<i class="fas fa-edit text-gray-400"></i> Edit Explore Card';
-                        document.getElementById('btn-submit-text').innerText = 'Save Changes';
                         document.getElementById('explore-modal').classList.remove('hidden');
                     } else {
-                        showToast(data.message || 'Could not load item details', 'error');
+                        showToast(data.message || 'Error fetching card data', 'error');
                     }
+                })
+                .catch(err => {
+                    console.error('Fetch card error:', err);
+                    showToast('Failed to fetch card details', 'error');
                 });
         }
 
@@ -457,29 +474,31 @@ if ($pdo) {
             document.getElementById('explore-modal').classList.add('hidden');
         }
 
-        function previewImage(input) {
+        function previewUpload(input) {
             if (input.files && input.files[0]) {
+                const file = input.files[0];
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('preview-filename').innerText = file.name;
                     document.getElementById('upload-placeholder').classList.add('hidden');
                     document.getElementById('upload-preview-box').classList.remove('hidden');
-                    document.getElementById('remove-image-flag').value = '0';
-                };
-                reader.readAsDataURL(input.files[0]);
+                    document.getElementById('inp-remove-image').value = '0';
+                }
+                reader.readAsDataURL(file);
             }
         }
 
-        function clearImage(e) {
+        function clearPhoto(e) {
             e.stopPropagation();
             document.getElementById('file-input').value = '';
             document.getElementById('inp-modal-image-url').value = '';
-            document.getElementById('remove-image-flag').value = '1';
-            document.getElementById('upload-preview-box').classList.add('hidden');
+            document.getElementById('inp-remove-image').value = '1';
             document.getElementById('upload-placeholder').classList.remove('hidden');
+            document.getElementById('upload-preview-box').classList.add('hidden');
         }
 
-        function handleExploreSubmit(e) {
+        function handleFormSubmit(e) {
             e.preventDefault();
             const form = document.getElementById('explore-form');
             const formData = new FormData(form);
@@ -506,18 +525,18 @@ if ($pdo) {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
                 if (data.status === 'success') {
-                    showToast(data.message, 'success');
+                    showToast(data.message || 'Card saved successfully!', 'success');
                     closeModal();
                     loadExplore();
                 } else {
-                    showToast(data.message || 'Failed to save', 'error');
+                    showToast(data.message || 'Failed to save card', 'error');
                 }
             })
             .catch(err => {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
-                console.error(err);
-                showToast('Network error saving explore card', 'error');
+                console.error('Save card error:', err);
+                showToast(err.message || 'Network error saving explore card', 'error');
             });
         }
 
@@ -527,7 +546,10 @@ if ($pdo) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'toggle_status', id: id })
             })
-            .then(res => res.json())
+            .then(async res => {
+                const text = await res.text();
+                try { return JSON.parse(text); } catch (e) { throw new Error(text || `Error ${res.status}`); }
+            })
             .then(data => {
                 if (data.status === 'success') {
                     showToast(data.message, 'success');
@@ -535,12 +557,15 @@ if ($pdo) {
                 } else {
                     showToast(data.message || 'Failed to toggle status', 'error');
                 }
+            })
+            .catch(err => {
+                console.error('Toggle error:', err);
+                showToast('Network error updating status', 'error');
             });
         }
 
-        function openDeleteModal(id, name) {
+        function openDeleteModal(id) {
             deleteItemId = id;
-            document.getElementById('delete-name').innerText = `"${name}"`;
             document.getElementById('delete-modal').classList.remove('hidden');
         }
 
@@ -556,37 +581,25 @@ if ($pdo) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete', id: deleteItemId })
             })
-            .then(res => res.json())
+            .then(async res => {
+                const text = await res.text();
+                try { return JSON.parse(text); } catch (e) { throw new Error(text || `Error ${res.status}`); }
+            })
             .then(data => {
                 closeDeleteModal();
                 if (data.status === 'success') {
-                    showToast(data.message, 'success');
+                    showToast(data.message || 'Card deleted', 'success');
                     loadExplore();
                 } else {
-                    showToast(data.message || 'Failed to delete item', 'error');
+                    showToast(data.message || 'Failed to delete card', 'error');
                 }
+            })
+            .catch(err => {
+                closeDeleteModal();
+                console.error('Delete error:', err);
+                showToast('Network error deleting card', 'error');
             });
         }
-
-        function showToast(msg, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 ${type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`;
-            toast.classList.remove('hidden');
-            setTimeout(() => { toast.classList.add('hidden'); }, 3500);
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
-        }
-
-        function escapeJs(str) {
-            if (!str) return '';
-            return String(str).replace(/'/g, "\\'");
-        }
-
-        window.addEventListener('DOMContentLoaded', loadExplore);
     </script>
 </body>
 </html>

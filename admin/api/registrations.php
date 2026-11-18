@@ -2,14 +2,16 @@
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 
-// Check if admin is logged in
-requireAdminAuth();
+// Check if admin is logged in (API safe)
+requireAdminApiAuth();
 
 $pdo = getDBConnection();
 
 if (!$pdo) {
     sendJSONResponse(['status' => 'error', 'message' => 'Database connection failed'], 500);
 }
+
+ensureCoreTables($pdo);
 
 // Handle POST requests (update/delete operations)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

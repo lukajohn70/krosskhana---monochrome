@@ -3,13 +3,18 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../../includes/email-helper.php';
 
-// Check if admin is logged in
-requireAdminAuth();
+// Check if admin is logged in (API version)
+requireAdminApiAuth();
 
 $pdo = getDBConnection();
 
 if (!$pdo) {
     sendJSONResponse(['status' => 'error', 'message' => 'Database connection failed'], 500);
+}
+
+// Ensure core tables exist
+if (function_exists('ensureCoreTables')) {
+    ensureCoreTables($pdo);
 }
 
 // Handle POST requests (update/delete operations)

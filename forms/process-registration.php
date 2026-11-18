@@ -59,13 +59,13 @@ if (!$pdo) {
 }
 
 try {
-    // Check if email already exists
-    $stmt = $pdo->prepare("SELECT id FROM racer_registrations WHERE email = ?");
+    // Check if duplicate submission within 2 minutes to prevent rapid spamming
+    $stmt = $pdo->prepare("SELECT id FROM racer_registrations WHERE email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE)");
     $stmt->execute([$email]);
-    $existing = $stmt->fetch();
+    $recentDuplicate = $stmt->fetch();
     
-    if ($existing) {
-        sendJSONResponse(['status' => 'error', 'message' => 'A registration with this email already exists'], 400);
+    if ($recentDuplicate) {
+        sendJSONResponse(['status' => 'error', 'message' => 'You have already submitted a registration recently. Please wait a moment before submitting again.'], 400);
     }
     
     // Insert new registration
@@ -92,8 +92,8 @@ try {
         'message' => 'Thank you for your registration! We will review your application and contact you soon.'
     ]);
     
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     error_log("Racer registration error: " . $e->getMessage());
-    sendJSONResponse(['status' => 'error', 'message' => 'An error occurred. Please try again later.'], 500);
+    sendJSONResponse(['status' => 'error', 'message' => 'Failed to save registration: ' . $e->getMessage()], 500);
 }
 ?>

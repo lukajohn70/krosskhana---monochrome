@@ -2,11 +2,12 @@
 /**
  * Core Database Schema Verifier & Self-Healing Migration
  * Automatically ensures all required tables and columns exist in MySQL.
+ * Each table is checked independently so that any one failure never blocks others.
  */
 
 function ensureCoreTables(PDO $pdo) {
+    // 1. admin_users
     try {
-        // 1. admin_users
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS admin_users (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -30,7 +31,6 @@ function ensureCoreTables(PDO $pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        // Check if 2FA columns exist on admin_users in case table existed before 2FA
         $cols = $pdo->query("SHOW COLUMNS FROM admin_users")->fetchAll(PDO::FETCH_COLUMN);
         $missingCols = [
             'two_factor_secret' => "ALTER TABLE admin_users ADD COLUMN two_factor_secret VARCHAR(255) NULL AFTER role",
@@ -43,11 +43,11 @@ function ensureCoreTables(PDO $pdo) {
         ];
         foreach ($missingCols as $c => $alterSql) {
             if (!in_array($c, $cols)) {
-                try { $pdo->exec($alterSql); } catch (Exception $e) {}
+                try { $pdo->exec($alterSql); } catch (Throwable $e) {}
             }
         }
 
-        // Ensure requested admin user lukajohn70@gmail.com exists with password '12'
+        // Default admin user check/seed
         try {
             $userCheck = $pdo->prepare("SELECT id, password_hash FROM admin_users WHERE email = ?");
             $userCheck->execute(['lukajohn70@gmail.com']);
@@ -57,11 +57,15 @@ function ensureCoreTables(PDO $pdo) {
                 $ins = $pdo->prepare("INSERT INTO admin_users (username, email, password_hash, role, is_active, must_setup_2fa) VALUES (?, ?, ?, 'admin', 1, 0)");
                 $ins->execute(['lukajohn70', 'lukajohn70@gmail.com', $hash]);
             }
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             error_log('Error checking/seeding default admin: ' . $e->getMessage());
         }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: admin_users error: ' . $e->getMessage());
+    }
 
-        // 2. password_resets
+    // 2. password_resets
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS password_resets (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -73,12 +77,15 @@ function ensureCoreTables(PDO $pdo) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_token_hash (token_hash),
             INDEX idx_admin_id (admin_id),
-            INDEX idx_email (email),
-            FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
+            INDEX idx_email (email)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: password_resets error: ' . $e->getMessage());
+    }
 
-        // 3. events
+    // 3. events
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS events (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -104,7 +111,25 @@ function ensureCoreTables(PDO $pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        // 4. contact_inquiries
+        // Seed initial events if empty
+        $eventCount = $pdo->query("SELECT COUNT(*) FROM events")->fetchColumn();
+        if ($eventCount == 0) {
+            $pdo->exec("
+            INSERT INTO events (title, slug, event_type, badge_text, event_date_text, event_date, description, image_url, gradient_theme, button_text, button_link, sort_order, is_active) VALUES
+            ('Krosskhana 2023', 'krosskhana-2023', 'past', 'Past Event', 'December 2023', '2023-12-01', 'Experience the thrill of our 2023 edition with over 2,000 attendees and exclusive Fast X premiere.', 'pictures/7.png', 'from-white to-gray-300', 'View Gallery', '', 1, 1),
+            ('Motor Sport Festival', 'motor-sport-festival-2023', 'past', 'Past Event', 'October 2023', '2023-10-01', 'A celebration of automotive culture featuring drifting competitions and live performances.', 'pictures/8.png', 'from-gray-300 to-white', 'View Gallery', '', 2, 1),
+            ('Summer Drift', 'summer-drift-2023', 'past', 'Past Event', 'August 2023', '2023-08-01', 'High-octane drifting competition with music and fashion showcases.', 'pictures/1.png', 'from-white to-gray-300', 'View Gallery', '', 3, 1),
+            ('Avant Gardex', 'avant-gardex-2024', 'upcoming', 'Coming Soon', 'March 2024', '2024-03-01', 'The most anticipated event of the year - where innovation meets automotive excellence.', 'pictures/2.png', 'from-white to-gray-300', 'Learn More', '', 1, 1),
+            ('Spring Racing', 'spring-racing-2024', 'upcoming', 'Coming Soon', 'May 2024', '2024-05-01', 'Revolutionary racing experience with cutting-edge technology and innovation showcases.', 'pictures/3.png', 'from-gray-300 to-white', 'Learn More', '', 2, 1),
+            ('Summer Championship', 'summer-championship-2024', 'upcoming', 'Coming Soon', 'July 2024', '2024-07-01', 'The ultimate test of precision and speed. The championship event of the season.', 'pictures/4.png', 'from-white to-gray-300', 'Learn More', '', 3, 1);
+            ");
+        }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: events error: ' . $e->getMessage());
+    }
+
+    // 4. contact_inquiries
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS contact_inquiries (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -124,8 +149,12 @@ function ensureCoreTables(PDO $pdo) {
             INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: contact_inquiries error: ' . $e->getMessage());
+    }
 
-        // 5. corporate_inquiries
+    // 5. corporate_inquiries
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS corporate_inquiries (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -134,7 +163,7 @@ function ensureCoreTables(PDO $pdo) {
             media_representative BOOLEAN DEFAULT FALSE,
             company VARCHAR(255) NOT NULL,
             contact_person VARCHAR(255) NOT NULL,
-            role_title VARCHAR(255) NOT NULL,
+            role_title VARCHAR(255) NULL,
             email VARCHAR(255) NOT NULL,
             phone VARCHAR(50) NOT NULL,
             website_social VARCHAR(255),
@@ -145,7 +174,7 @@ function ensureCoreTables(PDO $pdo) {
             rd_demonstration BOOLEAN DEFAULT FALSE,
             other_interest BOOLEAN DEFAULT FALSE,
             other_interest_text TEXT,
-            status ENUM('pending', 'contacted', 'partnered', 'declined') DEFAULT 'pending',
+            status VARCHAR(50) DEFAULT 'pending',
             admin_notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -156,7 +185,39 @@ function ensureCoreTables(PDO $pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        // 6. sponsorship_inquiries
+        // Verify all required columns exist in corporate_inquiries
+        $corpCols = $pdo->query("SHOW COLUMNS FROM corporate_inquiries")->fetchAll(PDO::FETCH_COLUMN);
+        $expectedCorpCols = [
+            'brand_collaboration' => "ALTER TABLE corporate_inquiries ADD COLUMN brand_collaboration BOOLEAN DEFAULT FALSE",
+            'vendor_opportunities' => "ALTER TABLE corporate_inquiries ADD COLUMN vendor_opportunities BOOLEAN DEFAULT FALSE",
+            'media_representative' => "ALTER TABLE corporate_inquiries ADD COLUMN media_representative BOOLEAN DEFAULT FALSE",
+            'company' => "ALTER TABLE corporate_inquiries ADD COLUMN company VARCHAR(255) NOT NULL DEFAULT ''",
+            'contact_person' => "ALTER TABLE corporate_inquiries ADD COLUMN contact_person VARCHAR(255) NOT NULL DEFAULT ''",
+            'role_title' => "ALTER TABLE corporate_inquiries ADD COLUMN role_title VARCHAR(255) NULL",
+            'email' => "ALTER TABLE corporate_inquiries ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT ''",
+            'phone' => "ALTER TABLE corporate_inquiries ADD COLUMN phone VARCHAR(50) NOT NULL DEFAULT ''",
+            'website_social' => "ALTER TABLE corporate_inquiries ADD COLUMN website_social VARCHAR(255) NULL",
+            'event_integration' => "ALTER TABLE corporate_inquiries ADD COLUMN event_integration BOOLEAN DEFAULT FALSE",
+            'product_showcase' => "ALTER TABLE corporate_inquiries ADD COLUMN product_showcase BOOLEAN DEFAULT FALSE",
+            'brand_activation' => "ALTER TABLE corporate_inquiries ADD COLUMN brand_activation BOOLEAN DEFAULT FALSE",
+            'content_collaboration' => "ALTER TABLE corporate_inquiries ADD COLUMN content_collaboration BOOLEAN DEFAULT FALSE",
+            'rd_demonstration' => "ALTER TABLE corporate_inquiries ADD COLUMN rd_demonstration BOOLEAN DEFAULT FALSE",
+            'other_interest' => "ALTER TABLE corporate_inquiries ADD COLUMN other_interest BOOLEAN DEFAULT FALSE",
+            'other_interest_text' => "ALTER TABLE corporate_inquiries ADD COLUMN other_interest_text TEXT NULL",
+            'status' => "ALTER TABLE corporate_inquiries ADD COLUMN status VARCHAR(50) DEFAULT 'pending'",
+            'admin_notes' => "ALTER TABLE corporate_inquiries ADD COLUMN admin_notes TEXT NULL"
+        ];
+        foreach ($expectedCorpCols as $col => $sql) {
+            if (!in_array($col, $corpCols)) {
+                try { $pdo->exec($sql); } catch (Throwable $e) {}
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: corporate_inquiries error: ' . $e->getMessage());
+    }
+
+    // 6. sponsorship_inquiries
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS sponsorship_inquiries (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -185,7 +246,7 @@ function ensureCoreTables(PDO $pdo) {
             investment_15k_50k BOOLEAN DEFAULT FALSE,
             investment_50k_100k BOOLEAN DEFAULT FALSE,
             investment_100k_plus BOOLEAN DEFAULT FALSE,
-            status ENUM('pending', 'contacted', 'partnered', 'declined') DEFAULT 'pending',
+            status VARCHAR(50) DEFAULT 'pending',
             admin_notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -196,7 +257,28 @@ function ensureCoreTables(PDO $pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        // 7. racer_registrations
+        $sponsCols = $pdo->query("SHOW COLUMNS FROM sponsorship_inquiries")->fetchAll(PDO::FETCH_COLUMN);
+        $expectedSponsCols = [
+            'organization' => "ALTER TABLE sponsorship_inquiries ADD COLUMN organization VARCHAR(255) NOT NULL DEFAULT ''",
+            'contact_person' => "ALTER TABLE sponsorship_inquiries ADD COLUMN contact_person VARCHAR(255) NOT NULL DEFAULT ''",
+            'title' => "ALTER TABLE sponsorship_inquiries ADD COLUMN title VARCHAR(255) NULL",
+            'email' => "ALTER TABLE sponsorship_inquiries ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT ''",
+            'phone' => "ALTER TABLE sponsorship_inquiries ADD COLUMN phone VARCHAR(50) NOT NULL DEFAULT ''",
+            'website' => "ALTER TABLE sponsorship_inquiries ADD COLUMN website VARCHAR(255) NULL",
+            'status' => "ALTER TABLE sponsorship_inquiries ADD COLUMN status VARCHAR(50) DEFAULT 'pending'",
+            'admin_notes' => "ALTER TABLE sponsorship_inquiries ADD COLUMN admin_notes TEXT NULL"
+        ];
+        foreach ($expectedSponsCols as $col => $sql) {
+            if (!in_array($col, $sponsCols)) {
+                try { $pdo->exec($sql); } catch (Throwable $e) {}
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: sponsorship_inquiries error: ' . $e->getMessage());
+    }
+
+    // 7. racer_registrations
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS racer_registrations (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -218,7 +300,7 @@ function ensureCoreTables(PDO $pdo) {
             semi_pro BOOLEAN DEFAULT FALSE,
             professional BOOLEAN DEFAULT FALSE,
             additional_info TEXT,
-            status ENUM('pending', 'approved', 'rejected', 'waitlist') DEFAULT 'pending',
+            status VARCHAR(50) DEFAULT 'pending',
             admin_notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -227,8 +309,12 @@ function ensureCoreTables(PDO $pdo) {
             INDEX idx_created_at (created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: racer_registrations error: ' . $e->getMessage());
+    }
 
-        // 8. newsletter_subscriptions
+    // 8. newsletter_subscriptions
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS newsletter_subscriptions (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -243,7 +329,6 @@ function ensureCoreTables(PDO $pdo) {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
 
-        // 8b. subscriber_tags & subscriber_tag_relationships
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS subscriber_tags (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -266,8 +351,12 @@ function ensureCoreTables(PDO $pdo) {
             INDEX idx_tag_id (tag_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: newsletter error: ' . $e->getMessage());
+    }
 
-        // 9. team_members
+    // 9. team_members
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS team_members (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -300,8 +389,12 @@ function ensureCoreTables(PDO $pdo) {
             ('Femi', 'Technical Lead', 'fas fa-cogs', 'from-gray-500 to-gray-700', 3, 1);
             ");
         }
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: team_members error: ' . $e->getMessage());
+    }
 
-        // 10. explore_items
+    // 10. explore_items
+    try {
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS explore_items (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -337,8 +430,7 @@ function ensureCoreTables(PDO $pdo) {
             ('Exclusive High-End Events', 'Experience premium motorsports crafted for discerning enthusiasts.', 'Premium Experience', 'Experience premium motorsports crafted for discerning enthusiasts.', 'pictures/6.png', 'fas fa-crown', 'from-gray-300 to-white', 2, 6, 1);
             ");
         }
-
-    } catch (Exception $e) {
-        error_log('ensureCoreTables error: ' . $e->getMessage());
+    } catch (Throwable $e) {
+        error_log('ensureCoreTables: explore_items error: ' . $e->getMessage());
     }
 }

@@ -17,6 +17,9 @@ $stats = [
 
 if ($pdo) {
     try {
+        if (function_exists('ensureCoreTables')) {
+            ensureCoreTables($pdo);
+        }
         $stmt = $pdo->query("SELECT 
             COUNT(*) as total,
             COUNT(CASE WHEN is_active = 1 THEN 1 END) as active,
@@ -38,245 +41,214 @@ if ($pdo) {
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { poppins: ['Poppins', 'sans-serif'] },
-                    colors: {
-                        dark: {
-                            50: '#f8fafc',
-                            800: '#1e293b',
-                            900: '#0f172a',
-                            950: '#020617'
-                        }
-                    }
+                    fontFamily: { poppins: ['Poppins', 'sans-serif'], orbitron: ['Orbitron', 'monospace'] }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-dark-950 text-white font-poppins min-h-screen">
-    <div class="flex h-screen overflow-hidden">
-        <!-- Sidebar Navigation -->
-        <?php include __DIR__ . '/includes/sidebar.php'; ?>
+<body class="bg-gray-50 min-h-screen font-poppins">
+    <?php $pageTitle = 'Team Management'; ?>
+    <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
-        <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col overflow-y-auto">
-            <!-- Top Bar -->
-            <header class="border-b border-gray-800 bg-dark-900/60 backdrop-blur-md sticky top-0 z-20 px-6 py-4 flex items-center justify-between">
-                <div>
-                    <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                        <i class="fas fa-users text-gray-400"></i> Team Management
-                    </h1>
-                    <p class="text-xs text-gray-400">Manage leadership & team members displayed on the public website</p>
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300"></div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Members</dt>
+                <dd id="stat-total" class="text-3xl font-extrabold text-gray-900 mt-1"><?php echo $stats['total']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-gray-800 to-gray-700 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-users"></i>
+            </div>
+        </div>
+
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Active on Website</dt>
+                <dd id="stat-active" class="text-3xl font-extrabold text-emerald-600 mt-1"><?php echo $stats['active']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-check-circle"></i>
+            </div>
+        </div>
+
+        <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-sm hover:shadow-md rounded-2xl border border-gray-200/80 transition-all p-5 flex items-center justify-between">
+            <div>
+                <dt class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hidden / Draft</dt>
+                <dd id="stat-hidden" class="text-3xl font-extrabold text-gray-600 mt-1"><?php echo $stats['hidden']; ?></dd>
+            </div>
+            <div class="w-12 h-12 bg-gradient-to-tr from-gray-400 to-gray-500 text-white rounded-xl flex items-center justify-center text-xl shadow">
+                <i class="fas fa-eye-slash"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="bg-white shadow-sm rounded-2xl border border-gray-200/80 overflow-hidden mb-8">
+        <!-- Toolbar Header -->
+        <div class="p-5 sm:p-6 border-b border-gray-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-id-badge text-gray-700"></i> Leadership & Team Members
+                </h2>
+                <p class="text-xs text-gray-500 mt-0.5">Manage leadership profiles displayed in the "Meet the Team" section of the landing page.</p>
+            </div>
+            <div>
+                <button onclick="openCreateModal()" class="bg-gradient-to-r from-gray-900 to-black hover:from-gray-800 hover:to-gray-900 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow hover:shadow-md transition-all flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Add Team Member
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="p-6">
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="py-16 text-center text-gray-500">
+                <i class="fas fa-circle-notch fa-spin text-3xl mb-3 text-gray-700"></i>
+                <p class="text-sm font-medium">Loading team members...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden py-16 text-center">
+                <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4 text-gray-400 text-2xl">
+                    <i class="fas fa-user-slash"></i>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="openCreateModal()" class="px-4 py-2 bg-gradient-to-r from-white to-gray-200 text-black font-semibold rounded-xl text-xs hover:from-gray-100 hover:to-gray-300 transition shadow-lg flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Add Team Member
-                    </button>
-                </div>
-            </header>
+                <h3 class="text-base font-bold text-gray-900">No team members found</h3>
+                <p class="text-xs text-gray-500 max-w-sm mx-auto mt-1 mb-5">Click below to add leadership profiles to your website.</p>
+                <button onclick="openCreateModal()" class="px-4 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-xl shadow transition">
+                    <i class="fas fa-plus mr-1"></i> Add First Member
+                </button>
+            </div>
 
-            <main class="p-6 space-y-6 max-w-7xl mx-auto w-full">
-                <!-- Toast Notification -->
-                <div id="toast" class="hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300"></div>
-
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Members</span>
-                            <div class="text-2xl font-bold text-white mt-1" id="stat-total"><?php echo $stats['total']; ?></div>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-gray-800/80 flex items-center justify-center text-gray-300 text-xl border border-gray-700/50">
-                            <i class="fas fa-users"></i>
-                        </div>
-                    </div>
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-xs font-medium text-emerald-400 uppercase tracking-wider">Active on Website</span>
-                            <div class="text-2xl font-bold text-emerald-400 mt-1" id="stat-active"><?php echo $stats['active']; ?></div>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-emerald-950/40 flex items-center justify-center text-emerald-400 text-xl border border-emerald-800/50">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                    </div>
-                    <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-5 backdrop-blur-xl flex items-center justify-between">
-                        <div>
-                            <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Hidden / Draft</span>
-                            <div class="text-2xl font-bold text-gray-400 mt-1" id="stat-hidden"><?php echo $stats['hidden']; ?></div>
-                        </div>
-                        <div class="w-12 h-12 rounded-xl bg-gray-800/80 flex items-center justify-center text-gray-400 text-xl border border-gray-700/50">
-                            <i class="fas fa-eye-slash"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Team Members Grid -->
-                <div class="bg-dark-900/60 border border-gray-800 rounded-2xl p-6 backdrop-blur-xl">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-id-badge text-gray-400"></i> Current Team Members
-                        </h2>
-                        <span class="text-xs text-gray-500">Ordered by display priority</span>
-                    </div>
-
-                    <!-- Loading State -->
-                    <div id="loading-spinner" class="py-16 text-center text-gray-400">
-                        <i class="fas fa-circle-notch fa-spin text-3xl mb-3 text-white"></i>
-                        <p class="text-sm">Loading team members...</p>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div id="empty-state" class="hidden py-16 text-center text-gray-400">
-                        <div class="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4 text-gray-500 text-2xl">
-                            <i class="fas fa-user-slash"></i>
-                        </div>
-                        <h3 class="text-base font-semibold text-white">No team members yet</h3>
-                        <p class="text-xs text-gray-500 max-w-sm mx-auto mt-1 mb-4">Click below to add your first team member or leadership profile.</p>
-                        <button onclick="openCreateModal()" class="px-4 py-2 bg-gradient-to-r from-white to-gray-200 text-black font-semibold rounded-xl text-xs hover:from-gray-100 hover:to-gray-300 transition">
-                            <i class="fas fa-plus mr-1"></i> Add Team Member
-                        </button>
-                    </div>
-
-                    <!-- Cards Grid -->
-                    <div id="team-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-                </div>
-            </main>
+            <!-- Team Grid -->
+            <div id="team-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
     </div>
 
     <!-- Add / Edit Modal -->
-    <div id="member-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-dark-900 border border-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative my-8">
-            <div class="flex items-center justify-between pb-4 border-b border-gray-800 mb-6">
-                <h3 id="modal-title" class="text-base font-bold text-white flex items-center gap-2">
-                    <i class="fas fa-user-plus text-gray-400"></i> Add Team Member
+    <div id="member-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white border border-gray-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative my-8">
+            <div class="flex items-center justify-between pb-4 border-b border-gray-200 mb-5">
+                <h3 id="modal-title" class="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-user-plus text-gray-700"></i> Add Team Member
                 </h3>
-                <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-white transition">
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 p-1">
                     <i class="fas fa-times text-lg"></i>
                 </button>
             </div>
 
-            <form id="member-form" onsubmit="handleMemberSubmit(event)" enctype="multipart/form-data" class="space-y-4">
+            <form id="member-form" onsubmit="handleFormSubmit(event)" enctype="multipart/form-data" class="space-y-4">
                 <input type="hidden" name="action" id="form-action" value="create">
-                <input type="hidden" name="id" id="member-id" value="">
-                <input type="hidden" name="remove_image" id="remove-image-flag" value="0">
+                <input type="hidden" name="id" id="form-id" value="">
                 <input type="hidden" name="image_url" id="inp-image-url" value="">
+                <input type="hidden" name="remove_image" id="inp-remove-image" value="0">
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <!-- Name -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Full Name <span class="text-red-400">*</span></label>
-                        <input type="text" name="name" id="inp-name" required placeholder="e.g. Stevyn Johnson" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-gray-500">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Full Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="name" id="inp-name" required placeholder="e.g. Stevyn" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
                     </div>
 
                     <!-- Role -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Role / Position <span class="text-red-400">*</span></label>
-                        <input type="text" name="role" id="inp-role" required placeholder="e.g. Team Lead, Technical Lead" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-gray-500">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Role / Job Title <span class="text-red-500">*</span></label>
+                        <input type="text" name="role" id="inp-role" required placeholder="e.g. Team Lead" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
                     </div>
                 </div>
 
                 <!-- Bio -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-300 mb-1.5">Short Bio (Optional)</label>
-                    <textarea name="bio" id="inp-bio" rows="2" placeholder="Brief background or responsibilities..." class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-gray-500"></textarea>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Bio / Responsibilities</label>
+                    <textarea name="bio" id="inp-bio" rows="2" placeholder="Brief description of their responsibilities..." class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition"></textarea>
                 </div>
 
-                <!-- Profile Photo / Icon -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Profile Photo</label>
-                        <div class="border border-dashed border-gray-800 rounded-xl p-3 text-center cursor-pointer hover:border-gray-600 transition bg-dark-950/60" onclick="document.getElementById('file-input').click()">
-                            <input type="file" name="image_file" id="file-input" accept="image/*" class="hidden" onchange="previewImage(this)">
-                            <div id="upload-placeholder" class="py-2">
-                                <i class="fas fa-camera text-gray-500 text-lg mb-1"></i>
-                                <p class="text-[11px] text-gray-400">Click to upload photo</p>
+                <!-- Photo Upload Box -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Member Photo / Portrait</label>
+                    <div id="upload-box" class="border-2 border-dashed border-gray-300 hover:border-gray-500 rounded-xl p-4 text-center cursor-pointer transition bg-gray-50 relative" onclick="document.getElementById('file-input').click()">
+                        <input type="file" name="image_file" id="file-input" accept="image/*" class="hidden" onchange="previewUpload(this)">
+                        
+                        <div id="upload-placeholder" class="py-2">
+                            <i class="fas fa-cloud-upload-alt text-2xl text-gray-400 mb-1"></i>
+                            <p class="text-xs text-gray-600 font-medium">Click to upload photo</p>
+                            <p class="text-[11px] text-gray-400">JPG, PNG, WEBP up to 5MB</p>
+                        </div>
+
+                        <div id="upload-preview-box" class="hidden flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <img id="preview-img" src="" alt="Preview" class="w-12 h-12 rounded-full object-cover border border-gray-300">
+                                <span id="preview-filename" class="text-xs font-medium text-gray-700">Photo selected</span>
                             </div>
-                            <div id="upload-preview-box" class="hidden items-center justify-between gap-2 p-1">
-                                <img id="preview-img" src="" class="w-12 h-12 rounded-full object-cover border border-gray-700">
-                                <button type="button" onclick="clearImage(event)" class="text-xs text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
-                            </div>
+                            <button type="button" onclick="clearPhoto(event)" class="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1 bg-red-50 rounded-lg">
+                                Remove
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Icon & Theme if no photo -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Icon Class -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1.5">Default Avatar Icon</label>
-                        <select name="icon_class" id="inp-icon" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-gray-500">
-                            <option value="fas fa-user-tie">User Tie (fas fa-user-tie)</option>
-                            <option value="fas fa-tasks">Tasks / Manager (fas fa-tasks)</option>
-                            <option value="fas fa-cogs">Cogs / Technical (fas fa-cogs)</option>
-                            <option value="fas fa-car">Racing / Car (fas fa-car)</option>
-                            <option value="fas fa-wrench">Engineering (fas fa-wrench)</option>
-                            <option value="fas fa-shield-alt">Safety / Ops (fas fa-shield-alt)</option>
-                            <option value="fas fa-crown">Executive (fas fa-crown)</option>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Fallback Icon (FontAwesome)</label>
+                        <select name="icon_class" id="inp-icon" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                            <option value="fas fa-user-tie">👔 User Tie (Leadership)</option>
+                            <option value="fas fa-tasks">📋 Tasks / PM</option>
+                            <option value="fas fa-cogs">⚙️ Technical / Cogs</option>
+                            <option value="fas fa-car">🏎️ Motorsports / Car</option>
+                            <option value="fas fa-bullhorn">📢 Marketing / PR</option>
+                            <option value="fas fa-shield-alt">🛡️ Safety / Security</option>
+                            <option value="fas fa-camera">📷 Media / Photo</option>
                         </select>
-                        <span class="text-[10px] text-gray-500 mt-1 block">Shown if no profile photo uploaded</span>
                     </div>
-                </div>
 
-                <!-- Gradient Color Scheme -->
-                <div>
-                    <label class="block text-xs font-semibold text-gray-300 mb-1.5">Avatar Gradient Background</label>
-                    <div class="grid grid-cols-4 gap-2">
-                        <label class="border border-gray-800 rounded-lg p-2 flex items-center justify-center cursor-pointer hover:border-gray-600 bg-dark-950">
-                            <input type="radio" name="gradient_theme" value="from-gray-500 to-gray-700" checked class="sr-only">
-                            <div class="w-full h-6 rounded bg-gradient-to-r from-gray-500 to-gray-700 border border-gray-600"></div>
-                        </label>
-                        <label class="border border-gray-800 rounded-lg p-2 flex items-center justify-center cursor-pointer hover:border-gray-600 bg-dark-950">
-                            <input type="radio" name="gradient_theme" value="from-gray-700 to-gray-500" class="sr-only">
-                            <div class="w-full h-6 rounded bg-gradient-to-r from-gray-700 to-gray-500 border border-gray-600"></div>
-                        </label>
-                        <label class="border border-gray-800 rounded-lg p-2 flex items-center justify-center cursor-pointer hover:border-gray-600 bg-dark-950">
-                            <input type="radio" name="gradient_theme" value="from-gray-900 to-black" class="sr-only">
-                            <div class="w-full h-6 rounded bg-gradient-to-r from-gray-900 to-black border border-gray-600"></div>
-                        </label>
-                        <label class="border border-gray-800 rounded-lg p-2 flex items-center justify-center cursor-pointer hover:border-gray-600 bg-dark-950">
-                            <input type="radio" name="gradient_theme" value="from-white to-gray-400" class="sr-only">
-                            <div class="w-full h-6 rounded bg-gradient-to-r from-white to-gray-400 border border-gray-600"></div>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Socials & Order -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Gradient Theme -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">LinkedIn Profile (Optional)</label>
-                        <input type="url" name="linkedin_url" id="inp-linkedin" placeholder="https://linkedin.com/in/..." class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">Email / Contact (Optional)</label>
-                        <input type="email" name="email" id="inp-email" placeholder="name@krosskhana.org" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Card Accent Gradient</label>
+                        <select name="gradient_theme" id="inp-gradient" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                            <option value="from-gray-500 to-gray-700">Carbon Gray (Default)</option>
+                            <option value="from-gray-700 to-gray-500">Inverted Gray</option>
+                            <option value="from-gray-900 to-black">Deep Black</option>
+                            <option value="from-red-600 to-gray-900">Racing Crimson</option>
+                            <option value="from-emerald-600 to-gray-900">Track Green</option>
+                        </select>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4 pt-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    <!-- Sort Order -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-300 mb-1">Display Sort Order</label>
-                        <input type="number" name="sort_order" id="inp-sort" value="1" class="w-full bg-dark-950 border border-gray-800 rounded-xl px-3 py-2 text-xs text-white">
-                        <span class="text-[10px] text-gray-500">1 shows first</span>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Display Priority (Order)</label>
+                        <input type="number" name="sort_order" id="inp-sort" value="0" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-700 transition">
+                        <span class="text-[11px] text-gray-400">Lower numbers appear first</span>
                     </div>
-                    <div class="flex items-center justify-between pt-5">
-                        <span class="text-xs font-semibold text-white">Visible on Website</span>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="is_active" id="inp-active" value="1" checked class="sr-only peer">
-                            <div class="w-10 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+
+                    <!-- Active Toggle -->
+                    <div class="flex items-center gap-3 pt-4">
+                        <input type="checkbox" name="is_active" id="inp-active" value="1" checked class="w-4 h-4 rounded text-gray-900 focus:ring-gray-700 border-gray-300">
+                        <label for="inp-active" class="text-xs font-semibold text-gray-800">
+                            Visible on Website
                         </label>
                     </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-800 mt-6">
-                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-700 hover:border-gray-600 text-gray-300 rounded-xl text-xs font-medium hover:bg-gray-800/40 transition">
+                <div class="flex justify-end gap-3 pt-5 border-t border-gray-200">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-semibold text-gray-700 transition">
                         Cancel
                     </button>
-                    <button type="submit" id="btn-submit" class="px-5 py-2 bg-gradient-to-r from-white to-gray-200 text-black font-semibold rounded-xl text-xs hover:from-gray-100 hover:to-gray-300 transition shadow">
+                    <button type="submit" id="btn-submit" class="px-5 py-2 bg-gradient-to-r from-gray-900 to-black text-white hover:from-gray-800 hover:to-gray-900 rounded-xl text-xs font-semibold shadow transition flex items-center gap-2">
                         <span id="btn-submit-text">Save Member</span>
                     </button>
                 </div>
@@ -285,22 +257,39 @@ if ($pdo) {
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div id="delete-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-dark-900 border border-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
-            <div class="w-12 h-12 rounded-full bg-red-950/50 text-red-400 flex items-center justify-center mx-auto mb-3 border border-red-800/40 text-xl">
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white border border-gray-200 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
+            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-xl">
                 <i class="fas fa-trash-alt"></i>
             </div>
-            <h4 class="text-base font-bold text-white mb-1">Delete Team Member</h4>
-            <p class="text-xs text-gray-400 mb-6">Are you sure you want to remove <strong id="delete-name" class="text-white">this member</strong>? This action cannot be undone.</p>
-            <div class="flex items-center justify-center gap-3">
-                <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 border border-gray-700 text-gray-300 rounded-xl text-xs">Cancel</button>
-                <button type="button" id="confirm-delete-btn" onclick="executeDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-xs shadow">Delete</button>
+            <h3 class="text-base font-bold text-gray-900 mb-1">Delete Team Member?</h3>
+            <p class="text-xs text-gray-500 mb-5">This action will remove this member from the public website.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-semibold text-gray-700 transition">
+                    Cancel
+                </button>
+                <button onclick="executeDelete()" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition">
+                    Confirm Delete
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script>
         let deleteMemberId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTeam();
+        });
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-semibold transition-all duration-300 ${type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`;
+            toast.classList.remove('hidden');
+            setTimeout(() => { toast.classList.add('hidden'); }, 3500);
+        }
 
         function loadTeam() {
             document.getElementById('loading-spinner').classList.remove('hidden');
@@ -308,81 +297,93 @@ if ($pdo) {
             document.getElementById('empty-state').classList.add('hidden');
 
             fetch('api/team.php')
-                .then(res => res.json())
+                .then(async res => {
+                    const text = await res.text();
+                    try { return JSON.parse(text); } catch (e) { throw new Error(text.replace(/<[^>]+>/g, '').trim() || `Error ${res.status}`); }
+                })
                 .then(data => {
                     document.getElementById('loading-spinner').classList.add('hidden');
                     if (data.status === 'success') {
-                        // Update stats
                         if (data.stats) {
-                            document.getElementById('stat-total').innerText = data.stats.total;
-                            document.getElementById('stat-active').innerText = data.stats.active_count;
-                            document.getElementById('stat-hidden').innerText = data.stats.hidden_count;
+                            document.getElementById('stat-total').innerText = data.stats.total || 0;
+                            document.getElementById('stat-active').innerText = data.stats.active || 0;
+                            document.getElementById('stat-hidden').innerText = data.stats.hidden || 0;
                         }
-
-                        if (!data.data || data.data.length === 0) {
-                            document.getElementById('empty-state').classList.remove('hidden');
-                        } else {
-                            renderTeamGrid(data.data);
-                        }
+                        renderCards(data.data || []);
                     } else {
-                        showToast(data.message || 'Error loading team members', 'error');
+                        showToast(data.message || 'Error loading team data', 'error');
                     }
                 })
                 .catch(err => {
                     document.getElementById('loading-spinner').classList.add('hidden');
-                    console.error('Fetch error:', err);
+                    console.error('Fetch team error:', err);
                     showToast('Failed to load team data', 'error');
                 });
         }
 
-        function renderTeamGrid(members) {
-            const grid = document.getElementById('team-grid');
-            grid.innerHTML = members.map(m => {
-                const isPhoto = m.image_url && m.image_url.trim() !== '';
-                const photoHtml = isPhoto 
-                    ? `<img src="../${escapeHtml(m.image_url)}" class="w-20 h-20 rounded-full object-cover shadow-lg border-2 border-gray-700">`
-                    : `<div class="w-20 h-20 bg-gradient-to-r ${escapeHtml(m.gradient_theme || 'from-gray-500 to-gray-700')} rounded-full flex items-center justify-center shadow-lg"><i class="${escapeHtml(m.icon_class || 'fas fa-user-tie')} text-white text-3xl"></i></div>`;
+        function renderCards(members) {
+            const container = document.getElementById('team-grid');
+            const emptyState = document.getElementById('empty-state');
+            container.innerHTML = '';
+
+            if (!members || members.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            members.forEach(m => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between";
+
+                const iconOrImg = m.image_url 
+                    ? `<img src="../${m.image_url}" alt="${m.name}" class="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow-sm">`
+                    : `<div class="w-16 h-16 rounded-full bg-gradient-to-r ${m.gradient_theme || 'from-gray-500 to-gray-700'} flex items-center justify-center text-white text-2xl shadow-sm"><i class="${m.icon_class || 'fas fa-user-tie'}"></i></div>`;
 
                 const statusBadge = m.is_active == 1 
-                    ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40">Active</span>`
-                    : `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-800 text-gray-400 border border-gray-700">Hidden</span>`;
+                    ? `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Active</span>`
+                    : `<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-600">Hidden</span>`;
 
-                return `
-                    <div class="bg-dark-950/70 border border-gray-800 rounded-2xl p-6 relative flex flex-col items-center text-center hover:border-gray-700 transition">
-                        <div class="absolute top-4 right-4">${statusBadge}</div>
-                        <div class="mb-4">${photoHtml}</div>
-                        <h4 class="text-lg font-bold text-white">${escapeHtml(m.name)}</h4>
-                        <p class="text-xs text-gray-400 font-medium mb-3">${escapeHtml(m.role)}</p>
-                        ${m.bio ? `<p class="text-xs text-gray-400 line-clamp-2 mb-4 px-2">${escapeHtml(m.bio)}</p>` : ''}
-                        
-                        <div class="mt-auto pt-4 border-t border-gray-800/80 w-full flex items-center justify-between">
-                            <span class="text-[11px] text-gray-500">Order: ${m.sort_order}</span>
-                            <div class="flex items-center gap-1.5">
-                                <button onclick="toggleStatus(${m.id})" title="${m.is_active == 1 ? 'Hide on website' : 'Show on website'}" class="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/60 text-xs">
-                                    <i class="fas ${m.is_active == 1 ? 'fa-eye' : 'fa-eye-slash'}"></i>
-                                </button>
-                                <button onclick="openEditModal(${m.id})" title="Edit member" class="p-2 text-gray-400 hover:text-white rounded-lg hover:bg-gray-800/60 text-xs">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button onclick="openDeleteModal(${m.id}, '${escapeJs(m.name)}')" title="Delete member" class="p-2 text-red-400 hover:text-red-300 rounded-lg hover:bg-red-950/30 text-xs">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-start justify-between mb-4">
+                            ${iconOrImg}
+                            <div class="flex items-center gap-2">
+                                ${statusBadge}
+                                <span class="text-[11px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">#${m.sort_order}</span>
                             </div>
+                        </div>
+                        <h3 class="text-base font-bold text-gray-900">${m.name}</h3>
+                        <p class="text-xs font-semibold text-gray-500 mt-0.5">${m.role}</p>
+                        ${m.bio ? `<p class="text-xs text-gray-600 mt-3 leading-relaxed border-t border-gray-100 pt-2 line-clamp-3">${m.bio}</p>` : ''}
+                    </div>
+
+                    <div class="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between">
+                        <button onclick="toggleStatus(${m.id})" class="text-xs font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                            <i class="fas fa-power-off text-xs ${m.is_active == 1 ? 'text-emerald-500' : 'text-gray-400'}"></i>
+                            <span>${m.is_active == 1 ? 'Hide' : 'Publish'}</span>
+                        </button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openEditModal(${m.id})" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded-lg transition">
+                                <i class="fas fa-edit mr-1"></i> Edit
+                            </button>
+                            <button onclick="openDeleteModal(${m.id})" class="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                         </div>
                     </div>
                 `;
-            }).join('');
-            grid.classList.remove('hidden');
+                container.appendChild(card);
+            });
         }
 
         function openCreateModal() {
-            document.getElementById('member-form').reset();
+            document.getElementById('modal-title').innerHTML = '<i class="fas fa-user-plus text-gray-700"></i> Add Team Member';
             document.getElementById('form-action').value = 'create';
-            document.getElementById('member-id').value = '';
-            document.getElementById('modal-title').innerHTML = '<i class="fas fa-user-plus text-gray-400"></i> Add Team Member';
-            document.getElementById('btn-submit-text').innerText = 'Add Member';
-            document.getElementById('inp-active').checked = true;
-            document.getElementById('remove-image-flag').value = '0';
+            document.getElementById('form-id').value = '';
+            document.getElementById('member-form').reset();
+            document.getElementById('inp-image-url').value = '';
+            document.getElementById('inp-remove-image').value = '0';
             document.getElementById('upload-placeholder').classList.remove('hidden');
             document.getElementById('upload-preview-box').classList.add('hidden');
             document.getElementById('member-modal').classList.remove('hidden');
@@ -390,25 +391,29 @@ if ($pdo) {
 
         function openEditModal(id) {
             fetch(`api/team.php?id=${id}`)
-                .then(res => res.json())
+                .then(async res => {
+                    const text = await res.text();
+                    try { return JSON.parse(text); } catch (e) { throw new Error(text.replace(/<[^>]+>/g, '').trim() || `Error ${res.status}`); }
+                })
                 .then(data => {
                     if (data.status === 'success') {
                         const m = data.data;
+                        document.getElementById('modal-title').innerHTML = '<i class="fas fa-user-edit text-gray-700"></i> Edit Team Member';
                         document.getElementById('form-action').value = 'update';
-                        document.getElementById('member-id').value = m.id;
+                        document.getElementById('form-id').value = m.id;
                         document.getElementById('inp-name').value = m.name || '';
                         document.getElementById('inp-role').value = m.role || '';
                         document.getElementById('inp-bio').value = m.bio || '';
                         document.getElementById('inp-icon').value = m.icon_class || 'fas fa-user-tie';
-                        document.getElementById('inp-linkedin').value = m.linkedin_url || '';
-                        document.getElementById('inp-email').value = m.email || '';
-                        document.getElementById('inp-sort').value = m.sort_order || 1;
-                        document.getElementById('inp-active').checked = (m.is_active == 1);
+                        document.getElementById('inp-gradient').value = m.gradient_theme || 'from-gray-500 to-gray-700';
+                        document.getElementById('inp-sort').value = m.sort_order || 0;
+                        document.getElementById('inp-active').checked = m.is_active == 1;
                         document.getElementById('inp-image-url').value = m.image_url || '';
-                        document.getElementById('remove-image-flag').value = '0';
+                        document.getElementById('inp-remove-image').value = '0';
 
-                        if (m.image_url && m.image_url.trim() !== '') {
+                        if (m.image_url) {
                             document.getElementById('preview-img').src = '../' + m.image_url;
+                            document.getElementById('preview-filename').innerText = m.name + ' photo';
                             document.getElementById('upload-placeholder').classList.add('hidden');
                             document.getElementById('upload-preview-box').classList.remove('hidden');
                         } else {
@@ -416,12 +421,14 @@ if ($pdo) {
                             document.getElementById('upload-preview-box').classList.add('hidden');
                         }
 
-                        document.getElementById('modal-title').innerHTML = '<i class="fas fa-user-edit text-gray-400"></i> Edit Team Member';
-                        document.getElementById('btn-submit-text').innerText = 'Save Changes';
                         document.getElementById('member-modal').classList.remove('hidden');
                     } else {
-                        showToast(data.message || 'Could not load member details', 'error');
+                        showToast(data.message || 'Error fetching member data', 'error');
                     }
+                })
+                .catch(err => {
+                    console.error('Fetch member error:', err);
+                    showToast('Failed to fetch member details', 'error');
                 });
         }
 
@@ -429,29 +436,31 @@ if ($pdo) {
             document.getElementById('member-modal').classList.add('hidden');
         }
 
-        function previewImage(input) {
+        function previewUpload(input) {
             if (input.files && input.files[0]) {
+                const file = input.files[0];
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('preview-filename').innerText = file.name;
                     document.getElementById('upload-placeholder').classList.add('hidden');
                     document.getElementById('upload-preview-box').classList.remove('hidden');
-                    document.getElementById('remove-image-flag').value = '0';
-                };
-                reader.readAsDataURL(input.files[0]);
+                    document.getElementById('inp-remove-image').value = '0';
+                }
+                reader.readAsDataURL(file);
             }
         }
 
-        function clearImage(e) {
+        function clearPhoto(e) {
             e.stopPropagation();
             document.getElementById('file-input').value = '';
             document.getElementById('inp-image-url').value = '';
-            document.getElementById('remove-image-flag').value = '1';
-            document.getElementById('upload-preview-box').classList.add('hidden');
+            document.getElementById('inp-remove-image').value = '1';
             document.getElementById('upload-placeholder').classList.remove('hidden');
+            document.getElementById('upload-preview-box').classList.add('hidden');
         }
 
-        function handleMemberSubmit(e) {
+        function handleFormSubmit(e) {
             e.preventDefault();
             const form = document.getElementById('member-form');
             const formData = new FormData(form);
@@ -478,18 +487,18 @@ if ($pdo) {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
                 if (data.status === 'success') {
-                    showToast(data.message, 'success');
+                    showToast(data.message || 'Member saved successfully!', 'success');
                     closeModal();
                     loadTeam();
                 } else {
-                    showToast(data.message || 'Failed to save', 'error');
+                    showToast(data.message || 'Failed to save team member', 'error');
                 }
             })
             .catch(err => {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
-                console.error(err);
-                showToast('Network error saving team member', 'error');
+                console.error('Save member error:', err);
+                showToast(err.message || 'Network error saving team member', 'error');
             });
         }
 
@@ -499,7 +508,10 @@ if ($pdo) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'toggle_status', id: id })
             })
-            .then(res => res.json())
+            .then(async res => {
+                const text = await res.text();
+                try { return JSON.parse(text); } catch (e) { throw new Error(text || `Error ${res.status}`); }
+            })
             .then(data => {
                 if (data.status === 'success') {
                     showToast(data.message, 'success');
@@ -507,12 +519,15 @@ if ($pdo) {
                 } else {
                     showToast(data.message || 'Failed to toggle status', 'error');
                 }
+            })
+            .catch(err => {
+                console.error('Toggle error:', err);
+                showToast('Network error updating status', 'error');
             });
         }
 
-        function openDeleteModal(id, name) {
+        function openDeleteModal(id) {
             deleteMemberId = id;
-            document.getElementById('delete-name').innerText = `"${name}"`;
             document.getElementById('delete-modal').classList.remove('hidden');
         }
 
@@ -528,37 +543,25 @@ if ($pdo) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete', id: deleteMemberId })
             })
-            .then(res => res.json())
+            .then(async res => {
+                const text = await res.text();
+                try { return JSON.parse(text); } catch (e) { throw new Error(text || `Error ${res.status}`); }
+            })
             .then(data => {
                 closeDeleteModal();
                 if (data.status === 'success') {
-                    showToast(data.message, 'success');
+                    showToast(data.message || 'Member deleted', 'success');
                     loadTeam();
                 } else {
                     showToast(data.message || 'Failed to delete member', 'error');
                 }
+            })
+            .catch(err => {
+                closeDeleteModal();
+                console.error('Delete error:', err);
+                showToast('Network error deleting member', 'error');
             });
         }
-
-        function showToast(msg, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.className = `fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 ${type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`;
-            toast.classList.remove('hidden');
-            setTimeout(() => { toast.classList.add('hidden'); }, 3500);
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]));
-        }
-
-        function escapeJs(str) {
-            if (!str) return '';
-            return String(str).replace(/'/g, "\\'");
-        }
-
-        window.addEventListener('DOMContentLoaded', loadTeam);
     </script>
 </body>
 </html>
