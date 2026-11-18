@@ -190,38 +190,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     
     $whereClause = $whereConditions ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
     
-    // Get total count
-    $countSql = "SELECT COUNT(*) as total FROM contact_inquiries $whereClause";
-    $countStmt = $pdo->prepare($countSql);
-    $countStmt->execute($params);
-    $total = $countStmt->fetch()['total'];
-    
-    // Get data
-    $sql = "SELECT * FROM contact_inquiries $whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $data = $stmt->fetchAll();
-    
-    // Calculate pagination
-    $totalPages = ceil($total / $limit);
-    $from = $offset + 1;
-    $to = min($offset + $limit, $total);
-    
-    $pagination = [
-        'current_page' => $page,
-        'total_pages' => $totalPages,
-        'total' => $total,
-        'from' => $from,
-        'to' => $to,
-        'per_page' => $limit
-    ];
-    
-    sendJSONResponse([
-        'status' => 'success',
-        'data' => $data,
-        'pagination' => $pagination
-    ]);
+    try {
+        // Get total count
+        $countSql = "SELECT COUNT(*) as total FROM contact_inquiries $whereClause";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($params);
+        $countRow = $countStmt->fetch();
+        $total = $countRow ? (int)$countRow['total'] : 0;
+        
+        // Get data
+        $sql = "SELECT * FROM contact_inquiries $whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $data = $stmt->fetchAll();
+        
+        // Calculate pagination
+        $totalPages = $total > 0 ? ceil($total / $limit) : 1;
+        $from = $total > 0 ? $offset + 1 : 0;
+        $to = min($offset + $limit, $total);
+        
+        $pagination = [
+            'current_page' => $page,
+            'total_pages' => $totalPages,
+            'total' => $total,
+            'from' => $from,
+            'to' => $to,
+            'per_page' => $limit
+        ];
+        
+        sendJSONResponse([
+            'status' => 'success',
+            'data' => $data,
+            'pagination' => $pagination
+        ]);
+    } catch (PDOException $e) {
+        error_log('Contact inquiries fetch error: ' . $e->getMessage());
+        sendJSONResponse([
+            'status' => 'success',
+            'data' => [],
+            'pagination' => [
+                'current_page' => 1,
+                'total_pages' => 1,
+                'total' => 0,
+                'from' => 0,
+                'to' => 0,
+                'per_page' => $limit
+            ]
+        ]);
+    }
 }
 
 function handleSendReply($pdo, $input) {

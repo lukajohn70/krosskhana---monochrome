@@ -84,13 +84,23 @@ define('SESSION_TIMEOUT', 3600); // 1 hour in seconds
 define('MAX_FILE_SIZE', 5 * 1024 * 1024); // 5MB
 define('ALLOWED_FILE_TYPES', ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx']);
 
+// Include self-healing schema helper
+require_once __DIR__ . '/schema.php';
+
 // Database Connection Function
 function getDBConnection() {
+    static $schemaChecked = false;
     try {
         $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
         $pdo = new PDO($dsn, DB_USER, DB_PASS);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+
+        if (!$schemaChecked) {
+            $schemaChecked = true;
+            ensureCoreTables($pdo);
+        }
+
         return $pdo;
     } catch (PDOException $e) {
         if (DEVELOPMENT_MODE) {

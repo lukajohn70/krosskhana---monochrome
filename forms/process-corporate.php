@@ -84,26 +84,31 @@ try {
     
     $inquiryId = $pdo->lastInsertId();
     
-    // Send email notifications
-    $emailResults = sendCorporateFormNotifications([
-        'id' => $inquiryId,
-        'company' => $company,
-        'contact_person' => $contactPerson,
-        'role_title' => $roleTitle,
-        'email' => $email,
-        'phone' => $phone,
-        'website_social' => $websiteSocial,
-        'brand_collaboration' => $brandCollaboration,
-        'vendor_opportunities' => $vendorOpportunities,
-        'media_representative' => $mediaRepresentative,
-        'event_integration' => $eventIntegration,
-        'product_showcase' => $productShowcase,
-        'brand_activation' => $brandActivation,
-        'content_collaboration' => $contentCollaboration,
-        'rd_demonstration' => $rdDemonstration,
-        'other_interest' => $otherInterest,
-        'other_interest_text' => $otherInterestText
-    ]);
+    // Send email notifications safely without blocking submission
+    $emailResults = ['user_confirmation' => false, 'admin_notification' => false];
+    try {
+        $emailResults = sendCorporateFormNotifications([
+            'id' => $inquiryId,
+            'company' => $company,
+            'contact_person' => $contactPerson,
+            'role_title' => $roleTitle,
+            'email' => $email,
+            'phone' => $phone,
+            'website_social' => $websiteSocial,
+            'brand_collaboration' => $brandCollaboration,
+            'vendor_opportunities' => $vendorOpportunities,
+            'media_representative' => $mediaRepresentative,
+            'event_integration' => $eventIntegration,
+            'product_showcase' => $productShowcase,
+            'brand_activation' => $brandActivation,
+            'content_collaboration' => $contentCollaboration,
+            'rd_demonstration' => $rdDemonstration,
+            'other_interest' => $otherInterest,
+            'other_interest_text' => $otherInterestText
+        ]);
+    } catch (Throwable $te) {
+        error_log("Corporate form notification dispatch error: " . $te->getMessage());
+    }
     
     // Log email results
     if ($emailResults['user_confirmation']) {

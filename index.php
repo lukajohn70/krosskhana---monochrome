@@ -49,6 +49,40 @@ try {
 } catch (Exception $e) {
     error_log('Error loading events in index.php: ' . $e->getMessage());
 }
+
+// Fetch active explore items
+$exploreSlide1 = [];
+$exploreSlide2 = [];
+try {
+    if ($eventsPdo) {
+        $exploreStmt = $eventsPdo->query("SELECT * FROM explore_items WHERE is_active = 1 ORDER BY slide_number ASC, sort_order ASC, id ASC");
+        if ($exploreStmt) {
+            $allExplore = $exploreStmt->fetchAll();
+            foreach ($allExplore as $item) {
+                if ($item['slide_number'] == 2) {
+                    $exploreSlide2[] = $item;
+                } else {
+                    $exploreSlide1[] = $item;
+                }
+            }
+        }
+    }
+} catch (Exception $e) {
+    error_log('Error loading explore items: ' . $e->getMessage());
+}
+
+// Fetch active team members
+$teamMembers = [];
+try {
+    if ($eventsPdo) {
+        $teamStmt = $eventsPdo->query("SELECT * FROM team_members WHERE is_active = 1 ORDER BY sort_order ASC, id ASC");
+        if ($teamStmt) {
+            $teamMembers = $teamStmt->fetchAll();
+        }
+    }
+} catch (Exception $e) {
+    error_log('Error loading team members: ' . $e->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -743,202 +777,100 @@ try {
                     <!-- Slide 1 -->
                     <div class="w-full flex-shrink-0">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4">
-                            <!-- Autocross & Drifting Competitions -->
+                            <?php 
+                            $displaySlide1 = !empty($exploreSlide1) ? $exploreSlide1 : [
+                                ['title' => 'Autocross & Drifting Competitions', 'description' => 'Experience the raw thrill and precision of authentic racing.', 'modal_title' => 'Racing Excellence', 'modal_description' => 'Experience the raw thrill and precision of authentic racing competitions.', 'modal_image_url' => 'pictures/1.png', 'icon_class' => 'fas fa-car-side', 'gradient_theme' => 'from-white to-gray-300'],
+                                ['title' => 'R&D Showcases & Innovations', 'description' => 'Discover cutting-edge tech and future automotive developments.', 'modal_title' => 'Innovation Hub', 'modal_description' => 'Discover cutting-edge technology and future automotive developments.', 'modal_image_url' => 'pictures/2.png', 'icon_class' => 'fas fa-microscope', 'gradient_theme' => 'from-gray-300 to-white'],
+                                ['title' => 'Lifestyle Shows & Music Collabs', 'description' => 'Immerse yourself where automotive passion meets electrifying entertainment.', 'modal_title' => 'Entertainment Fusion', 'modal_description' => 'Where automotive passion meets electrifying entertainment experiences.', 'modal_image_url' => 'pictures/3.png', 'icon_class' => 'fas fa-music', 'gradient_theme' => 'from-white to-gray-300']
+                            ];
+                            foreach ($displaySlide1 as $item): 
+                                $cardGrad = !empty($item['gradient_theme']) ? $item['gradient_theme'] : 'from-white to-gray-300';
+                                $cardIcon = !empty($item['icon_class']) ? $item['icon_class'] : 'fas fa-car-side';
+                                $cardImg = !empty($item['modal_image_url']) ? $item['modal_image_url'] : 'pictures/1.png';
+                                $cardModalTitle = !empty($item['modal_title']) ? $item['modal_title'] : $item['title'];
+                                $cardModalDesc = !empty($item['modal_description']) ? $item['modal_description'] : $item['description'];
+                            ?>
                             <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-2xl transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up relative">
                                 <!-- Modal Hover Effect -->
                                 <div class="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-[99999] rounded-2xl flex items-center justify-center p-4" style="z-index: 99999 !important;">
                                     <div class="text-center transform scale-75 group-hover:scale-100 transition-transform duration-300 w-full">
                                         <!-- Modal Image -->
                                         <div class="w-80 h-80 md:w-96 md:h-96 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden relative group-hover:scale-110 transition-transform duration-300">
-                                            <img src="pictures/1.png" alt="Racing Action" class="w-full h-full object-cover">
+                                            <img src="<?php echo htmlspecialchars($cardImg); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>" class="w-full h-full object-cover">
                                         </div>
-                                        <h3 class="text-2xl font-bold text-white mb-2">Racing Excellence</h3>
-                                        <p class="text-gray-300 text-sm max-w-xs">Experience the raw thrill and precision of authentic racing competitions.</p>
+                                        <h3 class="text-2xl font-bold text-white mb-2"><?php echo htmlspecialchars($cardModalTitle); ?></h3>
+                                        <p class="text-gray-300 text-sm max-w-xs"><?php echo htmlspecialchars($cardModalDesc); ?></p>
                                     </div>
                                 </div>
 
                                 <!-- Original Content -->
                                 <div class="relative z-10">
                                     <div class="relative mb-4">
-                                        <div class="w-16 h-16 bg-gradient-to-r from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
-                                            <i class="fas fa-car-side text-black text-2xl"></i>
+                                        <div class="w-16 h-16 bg-gradient-to-r <?php echo htmlspecialchars($cardGrad); ?> rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
+                                            <i class="<?php echo htmlspecialchars($cardIcon); ?> text-black text-2xl"></i>
                                         </div>
-                                        <div class="absolute inset-0 bg-gradient-to-r from-white to-gray-300 rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
+                                        <div class="absolute inset-0 bg-gradient-to-r <?php echo htmlspecialchars($cardGrad); ?> rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
                                     </div>
                                     <h4 class="text-xl font-bold mb-3 text-white text-center group-hover:text-gray-300 transition-colors duration-300">
-                                        Autocross & Drifting Competitions
+                                        <?php echo htmlspecialchars($item['title']); ?>
                                     </h4>
                                     <p class="text-gray-300 text-center leading-relaxed text-sm">
-                                        Experience the raw thrill and precision of authentic racing.
+                                        <?php echo htmlspecialchars($item['description']); ?>
                                     </p>
-                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-white to-gray-300 rounded-full group-hover:w-1/2 transition-all duration-500"></div>
+                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r <?php echo htmlspecialchars($cardGrad); ?> rounded-full group-hover:w-1/2 transition-all duration-500"></div>
                                 </div>
                             </div>
-
-                            <!-- R&D Showcases & Innovations -->
-                            <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-2xl transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up relative">
-                                <!-- Modal Hover Effect -->
-                                <div class="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-[99999] rounded-2xl flex items-center justify-center p-4" style="z-index: 99999 !important;">
-                                    <div class="text-center transform scale-75 group-hover:scale-100 transition-transform duration-300 w-full">
-                                        <!-- Modal Image -->
-                                        <div class="w-80 h-80 md:w-96 md:h-96 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden relative group-hover:scale-110 transition-transform duration-300">
-                                            <img src="pictures/2.png" alt="Innovation & Technology" class="w-full h-full object-cover">
-                                        </div>
-                                        <h3 class="text-2xl font-bold text-white mb-2">Innovation Hub</h3>
-                                        <p class="text-gray-300 text-sm max-w-xs">Discover cutting-edge technology and future automotive developments.</p>
-                                    </div>
-                                </div>
-
-                                <!-- Original Content -->
-                                <div class="relative z-10">
-                                    <div class="relative mb-4">
-                                        <div class="w-16 h-16 bg-gradient-to-r from-gray-300 to-white rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
-                                            <i class="fas fa-microscope text-black text-2xl"></i>
-                                        </div>
-                                        <div class="absolute inset-0 bg-gradient-to-r from-gray-300 to-white rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-                                    </div>
-                                    <h4 class="text-xl font-bold mb-3 text-white text-center group-hover:text-gray-300 transition-colors duration-300">
-                                        R&D Showcases & Innovations
-                                    </h4>
-                                    <p class="text-gray-300 text-center leading-relaxed text-sm">
-                                        Discover cutting-edge tech and future automotive developments.
-                                    </p>
-                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-gray-300 to-white rounded-full group-hover:w-1/2 transition-all duration-500"></div>
-                                </div>
-                            </div>
-
-                            <!-- Lifestyle Shows & Music Collabs -->
-                            <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-2xl transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up relative">
-                                <!-- Modal Hover Effect -->
-                                <div class="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-[99999] rounded-2xl flex items-center justify-center p-4" style="z-index: 99999 !important;">
-                                    <div class="text-center transform scale-75 group-hover:scale-100 transition-transform duration-300 w-full">
-                                        <!-- Modal Image -->
-                                        <div class="w-80 h-80 md:w-96 md:h-96 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden relative group-hover:scale-110 transition-transform duration-300">
-                                            <img src="pictures/3.png" alt="Lifestyle & Entertainment" class="w-full h-full object-cover">
-                                        </div>
-                                        <h3 class="text-2xl font-bold text-white mb-2">Entertainment Fusion</h3>
-                                        <p class="text-gray-300 text-sm max-w-xs">Where automotive passion meets electrifying entertainment experiences.</p>
-                                    </div>
-                                </div>
-
-                                <!-- Original Content -->
-                                <div class="relative z-10">
-                                    <div class="relative mb-4">
-                                        <div class="w-16 h-16 bg-gradient-to-r from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
-                                            <i class="fas fa-music text-black text-2xl"></i>
-                                        </div>
-                                        <div class="absolute inset-0 bg-gradient-to-r from-white to-gray-300 rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-                                    </div>
-                                    <h4 class="text-xl font-bold mb-3 text-white text-center group-hover:text-gray-300 transition-colors duration-300">
-                                        Lifestyle Shows & Music Collabs
-                                    </h4>
-                                    <p class="text-gray-300 text-center leading-relaxed text-sm">
-                                        Immerse yourself where automotive passion meets electrifying entertainment.
-                                    </p>
-                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-white to-gray-300 rounded-full group-hover:w-1/2 transition-all duration-500"></div>
-                                </div>
-                            </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
 
                     <!-- Slide 2 -->
                     <div class="w-full flex-shrink-0">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 px-4">
-                            <!-- Fashion & Brand Activations -->
+                            <?php 
+                            $displaySlide2 = !empty($exploreSlide2) ? $exploreSlide2 : [
+                                ['title' => 'Fashion & Brand Activations', 'description' => 'Showcase your brand through innovative displays and strategic partnerships.', 'modal_title' => 'Style & Branding', 'modal_description' => 'Showcase your brand through innovative displays and strategic partnerships.', 'modal_image_url' => 'pictures/4.png', 'icon_class' => 'fas fa-tshirt', 'gradient_theme' => 'from-gray-300 to-white'],
+                                ['title' => 'Market Engagement & Fan Loyalty', 'description' => 'Build deep connections with our passionate, loyal community.', 'modal_title' => 'Community Love', 'modal_description' => 'Build deep connections with our passionate, loyal community.', 'modal_image_url' => 'pictures/5.png', 'icon_class' => 'fas fa-heart', 'gradient_theme' => 'from-white to-gray-300'],
+                                ['title' => 'Exclusive High-End Events', 'description' => 'Experience premium motorsports crafted for discerning enthusiasts.', 'modal_title' => 'Premium Experience', 'modal_description' => 'Experience premium motorsports crafted for discerning enthusiasts.', 'modal_image_url' => 'pictures/6.png', 'icon_class' => 'fas fa-crown', 'gradient_theme' => 'from-gray-300 to-white']
+                            ];
+                            foreach ($displaySlide2 as $item): 
+                                $cardGrad = !empty($item['gradient_theme']) ? $item['gradient_theme'] : 'from-gray-300 to-white';
+                                $cardIcon = !empty($item['icon_class']) ? $item['icon_class'] : 'fas fa-tshirt';
+                                $cardImg = !empty($item['modal_image_url']) ? $item['modal_image_url'] : 'pictures/4.png';
+                                $cardModalTitle = !empty($item['modal_title']) ? $item['modal_title'] : $item['title'];
+                                $cardModalDesc = !empty($item['modal_description']) ? $item['modal_description'] : $item['description'];
+                            ?>
                             <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-2xl transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up relative">
                                 <!-- Modal Hover Effect -->
                                 <div class="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-[99999] rounded-2xl flex items-center justify-center p-4" style="z-index: 99999 !important;">
                                     <div class="text-center transform scale-75 group-hover:scale-100 transition-transform duration-300 w-full">
                                         <!-- Modal Image -->
                                         <div class="w-80 h-80 md:w-96 md:h-96 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden relative group-hover:scale-110 transition-transform duration-300">
-                                            <img src="pictures/4.png" alt="Fashion & Branding" class="w-full h-full object-cover">
+                                            <img src="<?php echo htmlspecialchars($cardImg); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>" class="w-full h-full object-cover">
                                         </div>
-                                        <h3 class="text-2xl font-bold text-white mb-2">Style & Branding</h3>
-                                        <p class="text-gray-300 text-sm max-w-xs">Showcase your brand through innovative displays and strategic partnerships.</p>
+                                        <h3 class="text-2xl font-bold text-white mb-2"><?php echo htmlspecialchars($cardModalTitle); ?></h3>
+                                        <p class="text-gray-300 text-sm max-w-xs"><?php echo htmlspecialchars($cardModalDesc); ?></p>
                                     </div>
                                 </div>
 
                                 <!-- Original Content -->
                                 <div class="relative z-10">
                                     <div class="relative mb-4">
-                                        <div class="w-16 h-16 bg-gradient-to-r from-gray-300 to-white rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
-                                            <i class="fas fa-tshirt text-black text-2xl"></i>
+                                        <div class="w-16 h-16 bg-gradient-to-r <?php echo htmlspecialchars($cardGrad); ?> rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
+                                            <i class="<?php echo htmlspecialchars($cardIcon); ?> text-black text-2xl"></i>
                                         </div>
-                                        <div class="absolute inset-0 bg-gradient-to-r from-gray-300 to-white rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
+                                        <div class="absolute inset-0 bg-gradient-to-r <?php echo htmlspecialchars($cardGrad); ?> rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
                                     </div>
                                     <h4 class="text-xl font-bold mb-3 text-white text-center group-hover:text-gray-300 transition-colors duration-300">
-                                        Fashion & Brand Activations
+                                        <?php echo htmlspecialchars($item['title']); ?>
                                     </h4>
                                     <p class="text-gray-300 text-center leading-relaxed text-sm">
-                                        Showcase your brand through innovative displays and strategic partnerships.
+                                        <?php echo htmlspecialchars($item['description']); ?>
                                     </p>
-                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-gray-300 to-white rounded-full group-hover:w-1/2 transition-all duration-500"></div>
+                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r <?php echo htmlspecialchars($cardGrad); ?> rounded-full group-hover:w-1/2 transition-all duration-500"></div>
                                 </div>
                             </div>
-
-                            <!-- Market Engagement & Fan Loyalty -->
-                            <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-2xl transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up relative">
-                                <!-- Modal Hover Effect -->
-                                <div class="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-[99999] rounded-2xl flex items-center justify-center p-4" style="z-index: 99999 !important;">
-                                    <div class="text-center transform scale-75 group-hover:scale-100 transition-transform duration-300 w-full">
-                                        <!-- Modal Image -->
-                                        <div class="w-80 h-80 md:w-96 md:h-96 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden relative group-hover:scale-110 transition-transform duration-300">
-                                            <img src="pictures/5.png" alt="Community & Engagement" class="w-full h-full object-cover">
-                                        </div>
-                                        <h3 class="text-2xl font-bold text-white mb-2">Community Love</h3>
-                                        <p class="text-gray-300 text-sm max-w-xs">Build deep connections with our passionate, loyal community.</p>
-                                    </div>
-                                </div>
-
-                                <!-- Original Content -->
-                                <div class="relative z-10">
-                                    <div class="relative mb-4">
-                                        <div class="w-16 h-16 bg-gradient-to-r from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
-                                            <i class="fas fa-heart text-black text-2xl"></i>
-                                        </div>
-                                        <div class="absolute inset-0 bg-gradient-to-r from-white to-gray-300 rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-                                    </div>
-                                    <h4 class="text-xl font-bold mb-3 text-white text-center group-hover:text-gray-300 transition-colors duration-300">
-                                        Market Engagement & Fan Loyalty
-                                    </h4>
-                                    <p class="text-gray-300 text-center leading-relaxed text-sm">
-                                        Build deep connections with our passionate, loyal community.
-                                    </p>
-                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-white to-gray-300 rounded-full group-hover:w-1/2 transition-all duration-500"></div>
-                                </div>
-                            </div>
-
-                                                                                                                 <!-- Exclusive High-End Events -->
-                             <div class="group bg-gray-900/80 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 shadow-2xl transform group-hover:scale-105 transition-all duration-500 hover:shadow-white/20 animate-fade-in-up relative">
-                                 <!-- Modal Hover Effect -->
-                                 <div class="absolute inset-0 bg-black/90 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 z-[99999] rounded-2xl flex items-center justify-center p-4" style="z-index: 99999 !important;">
-                                    <div class="text-center transform scale-75 group-hover:scale-100 transition-transform duration-300 w-full">
-                                        <!-- Modal Image -->
-                                        <div class="w-80 h-80 md:w-96 md:h-96 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl overflow-hidden relative group-hover:scale-110 transition-transform duration-300">
-                                            <img src="pictures/6.png" alt="Premium Events" class="w-full h-full object-cover">
-                                        </div>
-                                        <h3 class="text-2xl font-bold text-white mb-2">Premium Experience</h3>
-                                        <p class="text-gray-300 text-sm max-w-xs">Experience premium motorsports crafted for discerning enthusiasts.</p>
-                                    </div>
-                                </div>
-
-                                <!-- Original Content -->
-                                <div class="relative z-10">
-                                    <div class="relative mb-4">
-                                        <div class="w-16 h-16 bg-gradient-to-r from-gray-300 to-white rounded-2xl flex items-center justify-center mx-auto transform group-hover:rotate-12 transition-transform duration-500">
-                                            <i class="fas fa-crown text-black text-2xl"></i>
-                                        </div>
-                                        <div class="absolute inset-0 bg-gradient-to-r from-gray-300 to-white rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-                                    </div>
-                                    <h4 class="text-xl font-bold mb-3 text-white text-center group-hover:text-gray-300 transition-colors duration-300">
-                                        Exclusive High-End Events
-                                    </h4>
-                                    <p class="text-gray-300 text-center leading-relaxed text-sm">
-                                        Experience premium motorsports crafted for discerning enthusiasts.
-                                    </p>
-                                    <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-1 bg-gradient-to-r from-gray-300 to-white rounded-full group-hover:w-1/2 transition-all duration-500"></div>
-                                </div>
-                            </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
@@ -1152,27 +1084,31 @@ try {
                 <div class="w-32 h-1 bg-gradient-to-r from-gray-500 to-gray-700 mx-auto rounded-full"></div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-4xl mx-auto">
+                <?php 
+                $displayTeam = !empty($teamMembers) ? $teamMembers : [
+                    ['name' => 'Stevyn', 'role' => 'Team Lead', 'icon_class' => 'fas fa-user-tie', 'gradient_theme' => 'from-gray-500 to-gray-700', 'image_url' => null, 'bio' => null],
+                    ['name' => 'Quame', 'role' => 'Project Manager', 'icon_class' => 'fas fa-tasks', 'gradient_theme' => 'from-gray-700 to-gray-500', 'image_url' => null, 'bio' => null],
+                    ['name' => 'Femi', 'role' => 'Technical Lead', 'icon_class' => 'fas fa-cogs', 'gradient_theme' => 'from-gray-500 to-gray-700', 'image_url' => null, 'bio' => null]
+                ];
+                foreach ($displayTeam as $tm): 
+                    $tGrad = !empty($tm['gradient_theme']) ? $tm['gradient_theme'] : 'from-gray-500 to-gray-700';
+                    $tIcon = !empty($tm['icon_class']) ? $tm['icon_class'] : 'fas fa-user-tie';
+                ?>
                 <div class="group bg-white rounded-2xl p-8 shadow-xl border border-gray-200 flex flex-col items-center text-center hover:shadow-2xl transition-all duration-300">
-                    <div class="w-20 h-20 bg-gradient-to-r from-gray-500 to-gray-700 rounded-full flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        <i class="fas fa-user-tie text-white text-3xl"></i>
+                    <div class="w-20 h-20 bg-gradient-to-r <?php echo htmlspecialchars($tGrad); ?> rounded-full flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300 overflow-hidden">
+                        <?php if (!empty($tm['image_url'])): ?>
+                            <img src="<?php echo htmlspecialchars($tm['image_url']); ?>" alt="<?php echo htmlspecialchars($tm['name']); ?>" class="w-full h-full object-cover rounded-full">
+                        <?php else: ?>
+                            <i class="<?php echo htmlspecialchars($tIcon); ?> text-white text-3xl"></i>
+                        <?php endif; ?>
                     </div>
-                    <h4 class="text-2xl font-bold text-gray-800 mb-2">Stevyn</h4>
-                    <p class="text-lg text-gray-600 font-semibold mb-2">Team Lead</p>
+                    <h4 class="text-2xl font-bold text-gray-800 mb-2"><?php echo htmlspecialchars($tm['name']); ?></h4>
+                    <p class="text-lg text-gray-600 font-semibold mb-2"><?php echo htmlspecialchars($tm['role']); ?></p>
+                    <?php if (!empty($tm['bio'])): ?>
+                        <p class="text-sm text-gray-500 mt-2 max-w-xs leading-relaxed"><?php echo htmlspecialchars($tm['bio']); ?></p>
+                    <?php endif; ?>
                 </div>
-                <div class="group bg-white rounded-2xl p-8 shadow-xl border border-gray-200 flex flex-col items-center text-center hover:shadow-2xl transition-all duration-300">
-                    <div class="w-20 h-20 bg-gradient-to-r from-gray-700 to-gray-500 rounded-full flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        <i class="fas fa-tasks text-white text-3xl"></i>
-                    </div>
-                    <h4 class="text-2xl font-bold text-gray-800 mb-2">Quame</h4>
-                    <p class="text-lg text-gray-600 font-semibold mb-2">Project Manager</p>
-                </div>
-                <div class="group bg-white rounded-2xl p-8 shadow-xl border border-gray-200 flex flex-col items-center text-center hover:shadow-2xl transition-all duration-300">
-                    <div class="w-20 h-20 bg-gradient-to-r from-gray-500 to-gray-700 rounded-full flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                        <i class="fas fa-cogs text-white text-3xl"></i>
-                    </div>
-                    <h4 class="text-2xl font-bold text-gray-800 mb-2">Femi</h4>
-                    <p class="text-lg text-gray-600 font-semibold mb-2">Technical Lead</p>
-                </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </section>

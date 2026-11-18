@@ -60,32 +60,31 @@ try {
         $name, $email, $subject, $message, $phone, $inquiryType
     ]);
     
-    // Send email notifications
-    require_once __DIR__ . '/../includes/form-notifications.php';
-    $notificationSystem = new FormNotificationSystem($pdo);
-    
-    $formData = [
-        'name' => $name,
-        'email' => $email,
-        'subject' => $subject,
-        'message' => $message,
-        'phone' => $phone,
-        'inquiry_type' => $inquiryType
-    ];
-    
-    $notificationResult = $notificationSystem->sendContactFormNotifications($formData);
-    
-    // Log notification results
-    if ($notificationResult['user_confirmation']) {
-        error_log("Contact form: User confirmation email sent to $email");
-    } else {
-        error_log("Contact form: Failed to send user confirmation email to $email");
-    }
-    
-    if ($notificationResult['admin_notification']) {
-        error_log("Contact form: Admin notification email sent");
-    } else {
-        error_log("Contact form: Failed to send admin notification email");
+    // Send email notifications safely without blocking submission
+    try {
+        require_once __DIR__ . '/../includes/form-notifications.php';
+        $notificationSystem = new FormNotificationSystem($pdo);
+        
+        $formData = [
+            'name' => $name,
+            'email' => $email,
+            'subject' => $subject,
+            'message' => $message,
+            'phone' => $phone,
+            'inquiry_type' => $inquiryType
+        ];
+        
+        $notificationResult = $notificationSystem->sendContactFormNotifications($formData);
+        
+        // Log notification results
+        if (!empty($notificationResult['user_confirmation'])) {
+            error_log("Contact form: User confirmation email sent to $email");
+        }
+        if (!empty($notificationResult['admin_notification'])) {
+            error_log("Contact form: Admin notification email sent");
+        }
+    } catch (Throwable $ne) {
+        error_log("Contact form notification error: " . $ne->getMessage());
     }
     
     sendJSONResponse([

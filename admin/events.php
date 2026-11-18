@@ -239,11 +239,11 @@ if ($pdo) {
                 </select>
 
                 <!-- Add Event Button -->
-                <button onclick="openCreateModal()" 
-                        class="bg-gradient-to-r from-gray-900 to-black hover:from-gray-800 hover:to-gray-900 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 flex items-center gap-2 transform hover:scale-[1.02]">
+                <a href="event-edit.php" 
+                   class="bg-gradient-to-r from-gray-900 to-black hover:from-gray-800 hover:to-gray-900 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 flex items-center gap-2 transform hover:scale-[1.02]">
                     <i class="fas fa-plus"></i>
                     <span>Add New Event</span>
-                </button>
+                </a>
             </div>
         </div>
 
@@ -701,9 +701,9 @@ if ($pdo) {
                             <div class="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                                 <div class="flex items-center gap-1.5">
                                     <!-- Edit Button -->
-                                    <button onclick="openEditModal(${ev.id})" class="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg transition shadow-sm flex items-center gap-1">
+                                    <a href="event-edit.php?id=${ev.id}" class="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold rounded-lg transition shadow-sm flex items-center gap-1">
                                         <i class="fas fa-edit"></i> Edit
-                                    </button>
+                                    </a>
 
                                     <!-- Quick Switch Type (Past <-> Upcoming) -->
                                     <button onclick="toggleEventType(${ev.id})" title="${toggleTypeActionLabel}" class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded-lg transition flex items-center gap-1 border border-gray-200">
