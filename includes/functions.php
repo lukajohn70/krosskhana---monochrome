@@ -265,8 +265,13 @@ function logActivity($action, $details = '', $userId = null) {
 
 /**
  * Send JSON response
+ * Cleans any buffered output (warnings/notices) before sending clean JSON
  */
 function sendJSONResponse($data, $statusCode = 200) {
+    // Clear any stray output (PHP warnings, notices, etc.) that would corrupt JSON
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
     http_response_code($statusCode);
     header('Content-Type: application/json');
     echo json_encode($data);

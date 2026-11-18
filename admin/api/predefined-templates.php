@@ -1,4 +1,5 @@
 <?php
+ob_start(); // Prevent stray output from corrupting JSON
 require_once '../../includes/config.php';
 require_once 'includes/auth.php';
 require_once '../../includes/email-templates.php';

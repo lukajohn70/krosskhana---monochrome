@@ -1,4 +1,5 @@
 <?php
+ob_start(); // Buffer output so PHP warnings/notices don't corrupt JSON
 require_once __DIR__ . '/../includes/config.php';
 
 // Check if it's a POST request
