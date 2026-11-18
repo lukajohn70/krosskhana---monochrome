@@ -1,5 +1,6 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Check if admin is logged in
 requireAdminAuth();
@@ -203,9 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $total = $countStmt->fetch()['total'];
     
     // Get data
-    $sql = "SELECT * FROM sponsorship_inquiries $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?";
-    $params[] = $limit;
-    $params[] = $offset;
+    $sql = "SELECT * FROM sponsorship_inquiries $whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

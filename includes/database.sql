@@ -216,13 +216,20 @@ CREATE TABLE IF NOT EXISTS racer_registrations (
     INDEX idx_full_name (full_name)
 );
 
--- Admin Users Table (for future multi-admin support)
+-- Admin Users Table (for multi-admin support & 2FA)
 CREATE TABLE IF NOT EXISTS admin_users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     role ENUM('admin', 'moderator') DEFAULT 'admin',
+    two_factor_secret VARCHAR(255) NULL,
+    two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    two_factor_confirmed_at DATETIME NULL,
+    recovery_codes TEXT NULL,
+    temp_2fa_code VARCHAR(20) NULL,
+    temp_2fa_expires_at DATETIME NULL,
+    must_setup_2fa TINYINT(1) NOT NULL DEFAULT 1,
     is_active BOOLEAN DEFAULT TRUE,
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -231,10 +238,20 @@ CREATE TABLE IF NOT EXISTS admin_users (
     INDEX idx_email (email)
 );
 
--- Insert default admin user (password: 1234)
-INSERT INTO admin_users (username, password_hash, email, role) VALUES 
-('admin', '$2y$10$69QJXVX7dNEAgDlgmEAfS.jaXFOC86/OsnNsCcMx8gWc76xGiwNzi', 'info@krosskhana.org', 'admin')
-ON DUPLICATE KEY UPDATE id=id;
+-- Admin Password Resets Table
+CREATE TABLE IF NOT EXISTS password_resets (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_token_hash (token_hash),
+    INDEX idx_admin_id (admin_id),
+    INDEX idx_email (email),
+    FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
+);
 
 -- Contact Inquiries Table
 CREATE TABLE IF NOT EXISTS contact_inquiries (
@@ -401,3 +418,37 @@ SELECT
 FROM contact_inquiries 
 GROUP BY DATE(created_at)
 ORDER BY inquiry_date DESC;
+
+-- Events Table (Past and Upcoming Events)
+CREATE TABLE IF NOT EXISTS events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL,
+    event_type ENUM('past', 'upcoming') NOT NULL DEFAULT 'upcoming',
+    badge_text VARCHAR(100) DEFAULT NULL,
+    event_date_text VARCHAR(100) NOT NULL,
+    event_date DATE DEFAULT NULL,
+    description TEXT NOT NULL,
+    image_url VARCHAR(500) DEFAULT NULL,
+    gradient_theme VARCHAR(50) DEFAULT 'from-white to-gray-300',
+    button_text VARCHAR(100) DEFAULT 'View Details',
+    button_link VARCHAR(500) DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_event_type (event_type),
+    INDEX idx_is_active (is_active),
+    INDEX idx_sort_order (sort_order),
+    INDEX idx_event_date (event_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Initial Events Seed Data
+INSERT INTO events (title, slug, event_type, badge_text, event_date_text, event_date, description, image_url, gradient_theme, button_text, button_link, sort_order, is_active) VALUES
+('Krosskhana 2023', 'krosskhana-2023', 'past', 'Past Event', 'December 2023', '2023-12-01', 'Experience the thrill of our 2023 edition with over 2,000 attendees and exclusive Fast X premiere.', '', 'from-white to-gray-300', 'View Gallery', '', 1, 1),
+('Motor Sport Festival', 'motor-sport-festival-2023', 'past', 'Past Event', 'October 2023', '2023-10-01', 'A celebration of automotive culture featuring drifting competitions and live performances.', '', 'from-gray-300 to-white', 'View Gallery', '', 2, 1),
+('Summer Drift', 'summer-drift-2023', 'past', 'Past Event', 'August 2023', '2023-08-01', 'High-octane drifting competition with music and fashion showcases.', '', 'from-white to-gray-300', 'View Gallery', '', 3, 1),
+('Avant Gardex', 'avant-gardex-2024', 'upcoming', 'Coming Soon', 'March 2024', '2024-03-01', 'The most anticipated event of the year - where innovation meets automotive excellence.', '', 'from-white to-gray-300', 'Learn More', '', 1, 1),
+('Spring Racing', 'spring-racing-2024', 'upcoming', 'Coming Soon', 'May 2024', '2024-05-01', 'Revolutionary racing experience with cutting-edge technology and innovation showcases.', '', 'from-gray-300 to-white', 'Learn More', '', 2, 1),
+('Summer Festival', 'summer-festival-2024', 'upcoming', 'Coming Soon', 'July 2024', '2024-07-01', 'A fusion of motor sport, music, fashion, and art in the ultimate summer celebration.', '', 'from-white to-gray-300', 'Learn More', '', 3, 1);
+

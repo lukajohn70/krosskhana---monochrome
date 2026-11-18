@@ -1,4 +1,10 @@
-# OS generated files
+# Logs
+*.log
+logs/
+php_errors.log
+mailchimp.log
+
+# OS files
 .DS_Store
 .DS_Store?
 ._*
@@ -14,71 +20,28 @@ Thumbs.db
 *.swo
 *~
 
-# Logs
-*.log
-logs/
+# Temporary files
+*.bak
+*.old
+*.orig
+test-email.php
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# Dependency directories
-node_modules/
-vendor/
+# Vendor (keep this but note it's a dependency)
+# vendor/
 
 # Environment files
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 
-# Temporary files
-*.tmp
-*.temp
+# Database backups
+*.sql.gz
+*.sql.bak
 
-# Backup files
-*.bak
-*.backup
+# Testing
+test-*.php
 
-# Cache files
-.cache/
-*.cache
-
-# Compiled files
-*.com
-*.class
-*.dll
-*.exe
-*.o
-*.so
-
-# Package files
-*.7z
-*.dmg
-*.gz
-*.iso
-*.jar
-*.rar
-*.tar
-*.zip
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Configuration files with sensitive data
-config.php
-database.php
-*.config.php
-
-# Upload directories (if any)
-uploads/
+# Cache
+cache/
+tmp/
 temp/
-

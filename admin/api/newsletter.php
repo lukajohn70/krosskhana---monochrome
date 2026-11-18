@@ -1,5 +1,6 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Check if admin is logged in
 requireAdminAuth();
@@ -149,10 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $countStmt->execute($params);
     $total = $countStmt->fetch()['total'];
     
-    // Get data
-    $sql = "SELECT * FROM newsletter_subscriptions $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?";
-    $params[] = $limit;
-    $params[] = $offset;
+    // Get data - LIMIT and OFFSET cannot use prepared statement placeholders
+    $sql = "SELECT * FROM newsletter_subscriptions $whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

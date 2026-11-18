@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -11,15 +12,26 @@ $pdo = getDBConnection();
 $stats = [];
 
 if ($pdo) {
-    // Get contact inquiry statistics
-    $stmt = $pdo->query("SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
-        COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved,
-        COUNT(CASE WHEN status = 'spam' THEN 1 END) as spam
-        FROM contact_inquiries");
-    $stats = $stmt->fetch();
+    // Get contact inquiry statistics - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+            COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
+            COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved,
+            COUNT(CASE WHEN status = 'spam' THEN 1 END) as spam
+            FROM contact_inquiries");
+        $stats = $stmt->fetch();
+    } catch (PDOException $e) {
+        // Contact inquiries table doesn't exist yet, use default values
+        $stats = [
+            'total' => 0,
+            'pending' => 0,
+            'contacted' => 0,
+            'resolved' => 0,
+            'spam' => 0
+        ];
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -477,6 +489,12 @@ if ($pdo) {
                                 <label class="block text-sm font-medium text-gray-700">Message</label>
                                 <p class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">${contact.message || 'N/A'}</p>
                             </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Reply to Contact</label>
+                                <textarea id="reply-message" rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-gray-500 focus:border-transparent" placeholder="Write your response to ${contact.name || 'this contact'}..."></textarea>
+                                <p class="mt-2 text-xs text-gray-500">This sends an email to ${contact.email || 'the contact email'} and updates inquiry status.</p>
+                            </div>
                             
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Created At</label>
@@ -492,6 +510,12 @@ if ($pdo) {
                         </div>
                         
                         <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+                            <button onclick="sendContactReply(${contact.id}, false)" class="px-4 py-2 text-sm font-medium text-white bg-gray-600 border border-transparent rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                                Send Reply
+                            </button>
+                            <button onclick="sendContactReply(${contact.id}, true)" class="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                Reply + Resolve
+                            </button>
                             <button onclick="closeContactModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
                                 Close
                             </button>
@@ -508,6 +532,48 @@ if ($pdo) {
             if (modal) {
                 modal.remove();
             }
+        }
+
+        function sendContactReply(id, markResolved = false) {
+            const textarea = document.getElementById('reply-message');
+            const replyMessage = textarea ? textarea.value.trim() : '';
+
+            if (!replyMessage) {
+                showError('Please enter a reply message before sending.');
+                return;
+            }
+
+            showLoading('Sending reply...');
+
+            fetch('api/contact.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'send_reply',
+                    id: id,
+                    reply_message: replyMessage,
+                    mark_resolved: markResolved
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+
+                if (data.status === 'success') {
+                    showSuccess(data.message || 'Reply sent successfully');
+                    closeContactModal();
+                    loadContactsData();
+                } else {
+                    showError(data.message || 'Failed to send reply');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+                showError('Failed to send reply');
+            });
         }
 
         function deleteContact(id) {
@@ -650,10 +716,18 @@ if ($pdo) {
         }
 
         function showSuccess(message) {
+            if (typeof showToast === 'function') {
+                showToast(message, 'success');
+                return;
+            }
             console.log('Success:', message);
         }
 
         function showError(message) {
+            if (typeof showToast === 'function') {
+                showToast(message, 'error');
+                return;
+            }
             console.error('Error:', message);
         }
     </script>

@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -7,50 +8,101 @@ if (!isAdminLoggedIn()) {
     exit;
 }
 
+$successMessage = $_SESSION['admin_flash_success'] ?? '';
+unset($_SESSION['admin_flash_success']);
+
 // Get dashboard statistics
 $pdo = getDBConnection();
 $stats = [];
 
 if ($pdo) {
-    // Newsletter stats
-    $stmt = $pdo->query("SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'active' THEN 1 END) as active FROM newsletter_subscriptions");
-    $newsletterStats = $stmt->fetch();
+    // Newsletter stats - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT COUNT(*) as total, COUNT(CASE WHEN status = 'active' THEN 1 END) as active FROM newsletter_subscriptions");
+        $newsletterStats = $stmt->fetch();
+    } catch (PDOException $e) {
+        // Newsletter table doesn't exist yet, use default values
+        $newsletterStats = [
+            'total' => 0,
+            'active' => 0
+        ];
+    }
     
-    // Racer registration stats
-    $stmt = $pdo->query("SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
-        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected
-        FROM racer_registrations");
-    $racerStats = $stmt->fetch();
+    // Racer registration stats - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+            COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
+            COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected
+            FROM racer_registrations");
+        $racerStats = $stmt->fetch();
+    } catch (PDOException $e) {
+        // Racer registrations table doesn't exist yet, use default values
+        $racerStats = [
+            'total' => 0,
+            'pending' => 0,
+            'approved' => 0,
+            'rejected' => 0
+        ];
+    }
     
-    // Corporate inquiry stats
-    $stmt = $pdo->query("SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
-        COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified
-        FROM corporate_inquiries");
-    $corporateStats = $stmt->fetch();
+    // Corporate inquiry stats - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+            COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
+            COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified
+            FROM corporate_inquiries");
+        $corporateStats = $stmt->fetch();
+    } catch (PDOException $e) {
+        // Corporate inquiries table doesn't exist yet, use default values
+        $corporateStats = [
+            'total' => 0,
+            'pending' => 0,
+            'contacted' => 0,
+            'qualified' => 0
+        ];
+    }
     
-    // Sponsorship inquiry stats
-    $stmt = $pdo->query("SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
-        COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified
-        FROM sponsorship_inquiries");
-    $sponsorshipStats = $stmt->fetch();
+    // Sponsorship inquiry stats - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+            COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
+            COUNT(CASE WHEN status = 'qualified' THEN 1 END) as qualified
+            FROM sponsorship_inquiries");
+        $sponsorshipStats = $stmt->fetch();
+    } catch (PDOException $e) {
+        // Sponsorship inquiries table doesn't exist yet, use default values
+        $sponsorshipStats = [
+            'total' => 0,
+            'pending' => 0,
+            'contacted' => 0,
+            'qualified' => 0
+        ];
+    }
     
-    // Contact inquiry stats
-    $stmt = $pdo->query("SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
-        COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved
-        FROM contact_inquiries");
-    $contactStats = $stmt->fetch();
+    // Contact inquiry stats - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+            COUNT(CASE WHEN status = 'contacted' THEN 1 END) as contacted,
+            COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved
+            FROM contact_inquiries");
+        $contactStats = $stmt->fetch();
+    } catch (PDOException $e) {
+        // Contact inquiries table doesn't exist yet, use default values
+        $contactStats = [
+            'total' => 0,
+            'pending' => 0,
+            'contacted' => 0,
+            'resolved' => 0
+        ];
+    }
     
     // Campaign stats - check if table exists first
     try {
@@ -58,12 +110,33 @@ if ($pdo) {
             COUNT(*) as total,
             COUNT(CASE WHEN status = 'draft' THEN 1 END) as drafts,
             COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled,
-            COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
-            SUM(sent_count) as total_sent,
-            SUM(opened_count) as total_opened,
-            SUM(clicked_count) as total_clicked
+            COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent
             FROM campaigns");
         $campaignStats = $stmt->fetch();
+        
+        // Add default values for tracking stats (these come from campaign_recipients table)
+        $campaignStats['total_sent'] = 0;
+        $campaignStats['total_opened'] = 0;
+        $campaignStats['total_clicked'] = 0;
+        
+        // Get tracking stats from campaign_recipients if available
+        try {
+            $trackingStmt = $pdo->query("SELECT 
+                COUNT(CASE WHEN status = 'sent' THEN 1 END) as total_sent,
+                COUNT(CASE WHEN status = 'opened' THEN 1 END) as total_opened,
+                COUNT(CASE WHEN status = 'clicked' THEN 1 END) as total_clicked
+                FROM campaign_recipients");
+            $trackingStats = $trackingStmt->fetch();
+            
+            if ($trackingStats) {
+                $campaignStats['total_sent'] = $trackingStats['total_sent'] ?? 0;
+                $campaignStats['total_opened'] = $trackingStats['total_opened'] ?? 0;
+                $campaignStats['total_clicked'] = $trackingStats['total_clicked'] ?? 0;
+            }
+        } catch (PDOException $e) {
+            // Tracking table doesn't exist yet, use default values
+        }
+        
     } catch (PDOException $e) {
         // Campaign table doesn't exist yet, use default values
         $campaignStats = [
@@ -77,9 +150,28 @@ if ($pdo) {
         ];
     }
     
+    // Events stats - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN event_type = 'past' THEN 1 END) as past,
+            COUNT(CASE WHEN event_type = 'upcoming' THEN 1 END) as upcoming,
+            COUNT(CASE WHEN is_active = 1 THEN 1 END) as active
+            FROM events");
+        $eventStats = $stmt->fetch();
+    } catch (PDOException $e) {
+        $eventStats = [
+            'total' => 0,
+            'past' => 0,
+            'upcoming' => 0,
+            'active' => 0
+        ];
+    }
+    
     $stats = [
         'newsletter' => $newsletterStats,
         'racer' => $racerStats,
+        'events' => $eventStats,
         'corporate' => $corporateStats,
         'sponsorship' => $sponsorshipStats,
         'contact' => $contactStats,
@@ -204,6 +296,11 @@ if ($pdo) {
                     <span class="font-medium">Registrations</span>
                 </a>
                 
+                <a href="events.php" class="flex items-center px-4 py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg">
+                    <i class="fas fa-calendar-alt mr-3"></i>
+                    <span class="font-medium">Events</span>
+                </a>
+                
                 <a href="contact.php" class="flex items-center px-4 py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg">
                     <i class="fas fa-envelope mr-3"></i>
                     <span class="font-medium">Contact</span>
@@ -223,6 +320,11 @@ if ($pdo) {
                     <i class="fas fa-bullhorn mr-3"></i>
                     <span class="font-medium">Campaigns</span>
                 </a>
+                
+                <a href="settings.php" class="flex items-center px-4 py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg">
+                    <i class="fas fa-cog mr-3"></i>
+                    <span class="font-medium">Settings</span>
+                </a>
             </nav>
             
             <!-- Sidebar Footer -->
@@ -240,9 +342,14 @@ if ($pdo) {
 
     <!-- Main Content -->
     <div class="lg:ml-64 pt-16 bg-gray-50 min-h-screen">
-        <div class="p-6">
+    <div class="p-6">
+        <?php if ($successMessage): ?>
+        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800 shadow-sm">
+            <?php echo htmlspecialchars($successMessage); ?>
+        </div>
+        <?php endif; ?>
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6 mb-8">
             <!-- Newsletter Subscribers -->
             <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-2xl rounded-2xl border border-gray-200/50 hover:shadow-lg transition-all duration-300">
                 <div class="p-5">
@@ -289,6 +396,31 @@ if ($pdo) {
                     <div class="text-sm">
                         <span class="text-gray-500 font-medium"><?php echo $stats['racer']['pending'] ?? 0; ?></span>
                         <span class="text-gray-600">pending</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Events -->
+            <div class="bg-white/90 backdrop-blur-xl overflow-hidden shadow-2xl rounded-2xl border border-gray-200/50 hover:shadow-lg transition-all duration-300">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <div class="w-8 h-8 bg-gradient-to-r from-gray-600 to-gray-700 rounded-md flex items-center justify-center">
+                                <i class="fas fa-calendar-alt text-white"></i>
+                            </div>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-600 truncate">Events</dt>
+                                <dd class="text-lg font-medium text-gray-900"><?php echo $stats['events']['total'] ?? 0; ?></dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-5 py-3 border-t border-gray-200/50">
+                    <div class="text-sm">
+                        <span class="text-gray-500 font-medium"><?php echo $stats['events']['upcoming'] ?? 0; ?></span>
+                        <span class="text-gray-600">upcoming</span>
                     </div>
                 </div>
             </div>
@@ -394,35 +526,13 @@ if ($pdo) {
             </div>
         </div>
 
-        <!-- Campaign System Setup Notice -->
-        <?php if (!isset($campaignStats) || $campaignStats['total'] === 0): ?>
-        <div class="bg-gray-50 backdrop-blur-xl border border-gray-200/50 rounded-2xl p-4 mb-6">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-info-circle text-gray-600"></i>
-                </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-gray-500">Campaign System Setup Required</h3>
-                    <div class="mt-2 text-sm text-gray-600">
-                        <p>The campaign system needs to be set up before you can create email campaigns.</p>
-                        <p class="mt-1">
-                            <a href="../setup-campaign-system.php" class="font-medium underline hover:text-gray-500 transition-colors duration-300">
-                                Click here to run the setup script
-                            </a>
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php endif; ?>
-
         <!-- Quick Actions -->
         <div class="bg-white/90 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 mb-8">
             <div class="px-6 py-4 border-b border-gray-200/50">
                 <h3 class="text-lg font-medium text-gray-900 font-orbitron">Quick Actions</h3>
             </div>
             <div class="p-6">
-                <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-4">
                     <a href="newsletter.php" class="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-200/50 transition-all duration-300 transform hover:scale-105 border border-gray-200/50">
                         <i class="fas fa-newspaper text-gray-500 text-2xl mb-2"></i>
                         <span class="text-sm font-medium text-gray-500">Newsletter</span>
@@ -430,6 +540,10 @@ if ($pdo) {
                     <a href="registrations.php" class="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-200/50 transition-all duration-300 transform hover:scale-105 border border-gray-200/50">
                         <i class="fas fa-car text-gray-500 text-2xl mb-2"></i>
                         <span class="text-sm font-medium text-gray-500">Registrations</span>
+                    </a>
+                    <a href="events.php" class="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-200/50 transition-all duration-300 transform hover:scale-105 border border-gray-200/50">
+                        <i class="fas fa-calendar-alt text-gray-500 text-2xl mb-2"></i>
+                        <span class="text-sm font-medium text-gray-500">Events</span>
                     </a>
                     <a href="corporate.php" class="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-200/50 transition-all duration-300 transform hover:scale-105 border border-gray-200/50">
                         <i class="fas fa-building text-gray-500 text-2xl mb-2"></i>

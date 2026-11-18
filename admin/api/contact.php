@@ -1,5 +1,7 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../../includes/email-helper.php';
 
 // Check if admin is logged in
 requireAdminAuth();
@@ -58,6 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (PDOException $e) {
                 sendJSONResponse(['status' => 'error', 'message' => 'Database error'], 500);
             }
+            break;
+
+        case 'send_reply':
+            handleSendReply($pdo, $input);
             break;
             
         default:
@@ -191,9 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $total = $countStmt->fetch()['total'];
     
     // Get data
-    $sql = "SELECT * FROM contact_inquiries $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?";
-    $params[] = $limit;
-    $params[] = $offset;
+    $sql = "SELECT * FROM contact_inquiries $whereClause ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -218,5 +222,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'data' => $data,
         'pagination' => $pagination
     ]);
+}
+
+function handleSendReply($pdo, $input) {
+    $id = (int) ($input['id'] ?? 0);
+    $replyMessage = trim($input['reply_message'] ?? '');
+    $markResolved = !empty($input['mark_resolved']);
+
+    if ($id <= 0 || $replyMessage === '') {
+        sendJSONResponse(['status' => 'error', 'message' => 'Inquiry ID and reply message are required'], 400);
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT id, name, email, subject, message FROM contact_inquiries WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $contact = $stmt->fetch();
+
+        if (!$contact) {
+            sendJSONResponse(['status' => 'error', 'message' => 'Inquiry not found'], 404);
+        }
+
+        $emailHelper = new EmailHelper($pdo);
+
+        $safeName = htmlspecialchars($contact['name'] ?? 'Customer', ENT_QUOTES, 'UTF-8');
+        $safeSubject = htmlspecialchars($contact['subject'] ?? 'Your inquiry', ENT_QUOTES, 'UTF-8');
+        $safeOriginalMessage = nl2br(htmlspecialchars($contact['message'] ?? '', ENT_QUOTES, 'UTF-8'));
+        $safeReplyMessage = nl2br(htmlspecialchars($replyMessage, ENT_QUOTES, 'UTF-8'));
+
+        $subject = 'Re: ' . ($contact['subject'] ?: 'Your inquiry');
+        $emailBody = "
+            <p>Hi {$safeName},</p>
+            <p>Thank you for contacting Krosskhana. Here is our response to your inquiry:</p>
+            <div style='background:#f8fafc;border-left:4px solid #4b5563;padding:16px;border-radius:8px;margin:16px 0;'>{$safeReplyMessage}</div>
+            <p style='margin-top:24px;'><strong>Your original subject:</strong> {$safeSubject}</p>
+            <div style='background:#f9fafb;border:1px solid #e5e7eb;padding:12px;border-radius:8px;margin:12px 0;'>{$safeOriginalMessage}</div>
+            <p>Best regards,<br>Krosskhana Team</p>
+        ";
+
+        $sent = $emailHelper->sendEmail(
+            $contact['email'],
+            $subject,
+            $emailBody,
+            (defined('EMAIL_FROM_NAME') ? EMAIL_FROM_NAME : FROM_NAME),
+            (defined('EMAIL_FROM_ADDRESS') ? EMAIL_FROM_ADDRESS : FROM_EMAIL)
+        );
+
+        if (!$sent) {
+            sendJSONResponse(['status' => 'error', 'message' => 'Failed to send reply email. Check SMTP settings and try again.'], 500);
+        }
+
+        $newStatus = $markResolved ? 'resolved' : 'contacted';
+        $adminNotePrefix = "[Admin Reply " . date('Y-m-d H:i:s') . "] ";
+        $adminNote = $adminNotePrefix . preg_replace('/\s+/', ' ', $replyMessage);
+        $adminNote = substr($adminNote, 0, 1000);
+
+        $updateStmt = $pdo->prepare("UPDATE contact_inquiries SET status = ?, admin_notes = CONCAT(IFNULL(admin_notes, ''), CASE WHEN admin_notes IS NULL OR admin_notes = '' THEN '' ELSE '\n\n' END, ?), updated_at = NOW() WHERE id = ?");
+        $updateStmt->execute([$newStatus, $adminNote, $id]);
+
+        sendJSONResponse([
+            'status' => 'success',
+            'message' => $markResolved
+                ? 'Reply sent and inquiry marked as resolved.'
+                : 'Reply sent and inquiry marked as contacted.'
+        ]);
+    } catch (PDOException $e) {
+        error_log('Contact reply error: ' . $e->getMessage());
+        sendJSONResponse(['status' => 'error', 'message' => 'Database error while sending reply'], 500);
+    }
 }
 ?>

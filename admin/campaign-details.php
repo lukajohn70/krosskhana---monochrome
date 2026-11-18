@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -19,27 +20,46 @@ $campaign = null;
 $stats = [];
 
 if ($pdo) {
-    // Get campaign details
-    $stmt = $pdo->prepare("SELECT * FROM campaigns WHERE id = ?");
-    $stmt->execute([$campaignId]);
-    $campaign = $stmt->fetch();
-    
-    if ($campaign) {
-        // Get campaign statistics
-        $stmt = $pdo->prepare("
-            SELECT 
-                COUNT(*) as total_recipients,
-                COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_count,
-                COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_count,
-                COUNT(CASE WHEN status = 'bounced' THEN 1 END) as bounced_count,
-                COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
-                COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened_count,
-                COUNT(CASE WHEN clicked_at IS NOT NULL THEN 1 END) as clicked_count
-            FROM campaign_recipients 
-            WHERE campaign_id = ?
-        ");
+    // Get campaign details - check if table exists first
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM campaigns WHERE id = ?");
         $stmt->execute([$campaignId]);
-        $stats = $stmt->fetch();
+        $campaign = $stmt->fetch();
+        
+        if ($campaign) {
+            // Get campaign statistics from campaign_recipients if available
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        COUNT(*) as total_recipients,
+                        COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent_count,
+                        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_count,
+                        COUNT(CASE WHEN status = 'bounced' THEN 1 END) as bounced_count,
+                        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
+                        COUNT(CASE WHEN opened_at IS NOT NULL THEN 1 END) as opened_count,
+                        COUNT(CASE WHEN clicked_at IS NOT NULL THEN 1 END) as clicked_count
+                    FROM campaign_recipients 
+                    WHERE campaign_id = ?
+                ");
+                $stmt->execute([$campaignId]);
+                $stats = $stmt->fetch();
+            } catch (PDOException $e) {
+                // Campaign recipients table doesn't exist yet, use default values
+                $stats = [
+                    'total_recipients' => 0,
+                    'sent_count' => 0,
+                    'delivered_count' => 0,
+                    'bounced_count' => 0,
+                    'failed_count' => 0,
+                    'opened_count' => 0,
+                    'clicked_count' => 0
+                ];
+            }
+        }
+    } catch (PDOException $e) {
+        // Campaigns table doesn't exist yet, redirect to campaigns page
+        header('Location: campaigns.php');
+        exit;
     }
 }
 

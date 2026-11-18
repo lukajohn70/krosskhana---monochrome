@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -11,17 +12,51 @@ $pdo = getDBConnection();
 $stats = [];
 
 if ($pdo) {
-    // Get campaign statistics
-    $stmt = $pdo->query("SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN status = 'draft' THEN 1 END) as drafts,
-        COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled,
-        COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
-        SUM(sent_count) as total_sent,
-        SUM(opened_count) as total_opened,
-        SUM(clicked_count) as total_clicked
-        FROM campaigns");
-    $stats = $stmt->fetch();
+    // Get campaign statistics - check if table exists first
+    try {
+        $stmt = $pdo->query("SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN status = 'draft' THEN 1 END) as drafts,
+            COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled,
+            COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent
+            FROM campaigns");
+        $stats = $stmt->fetch();
+        
+        // Add default values for tracking stats (these come from campaign_recipients table)
+        $stats['total_sent'] = 0;
+        $stats['total_opened'] = 0;
+        $stats['total_clicked'] = 0;
+        
+        // Get tracking stats from campaign_recipients if available
+        try {
+            $trackingStmt = $pdo->query("SELECT 
+                COUNT(CASE WHEN status = 'sent' THEN 1 END) as total_sent,
+                COUNT(CASE WHEN status = 'opened' THEN 1 END) as total_opened,
+                COUNT(CASE WHEN status = 'clicked' THEN 1 END) as total_clicked
+                FROM campaign_recipients");
+            $trackingStats = $trackingStmt->fetch();
+            
+            if ($trackingStats) {
+                $stats['total_sent'] = $trackingStats['total_sent'] ?? 0;
+                $stats['total_opened'] = $trackingStats['total_opened'] ?? 0;
+                $stats['total_clicked'] = $trackingStats['total_clicked'] ?? 0;
+            }
+        } catch (PDOException $e) {
+            // Tracking table doesn't exist yet, use default values
+        }
+        
+    } catch (PDOException $e) {
+        // Campaigns table doesn't exist yet, use default values
+        $stats = [
+            'total' => 0,
+            'drafts' => 0,
+            'scheduled' => 0,
+            'sent' => 0,
+            'total_sent' => 0,
+            'total_opened' => 0,
+            'total_clicked' => 0
+        ];
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -238,25 +273,7 @@ if ($pdo) {
             </div>
         </div>
 
-        <!-- Setup Notice -->
-        <div id="setup-notice" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 hidden">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-yellow-800">Campaign System Setup Required</h3>
-                    <div class="mt-2 text-sm text-yellow-700">
-                        <p>The campaign system needs to be set up before you can create campaigns. Please run the setup script first.</p>
-                    </div>
-                    <div class="mt-4">
-                        <a href="../setup-campaign-system.php" class="bg-yellow-100 text-yellow-800 px-3 py-2 rounded-md text-sm font-medium hover:bg-yellow-200 transition-colors duration-300">
-                            Run Setup
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
 
         <!-- Campaigns Table -->
         <div class="bg-white/90 backdrop-blur-xl shadow-2xl rounded-2xl border border-gray-200/50 overflow-hidden">
@@ -314,7 +331,7 @@ if ($pdo) {
     </div>
 
     <!-- Create Campaign Modal -->
-    <div id="create-campaign-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+                    <div id="create-campaign-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
         <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4">
@@ -457,7 +474,7 @@ if ($pdo) {
     </div>
 
     <!-- Template Selector Modal -->
-    <div id="template-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+                    <div id="template-selector-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
         <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-6">
@@ -475,7 +492,7 @@ if ($pdo) {
     </div>
 
     <!-- Templates Modal -->
-    <div id="templates-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+                    <div id="templates-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
         <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-white">
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-6">
@@ -548,21 +565,17 @@ if ($pdo) {
                 })
                 .catch(error => {
                     console.error('Fetch error:', error);
-                    // Show setup notice on error
-                    const setupNotice = document.getElementById('setup-notice');
-                    if (setupNotice) {
-                        setupNotice.style.display = 'block';
+                    const desktopTbody = document.getElementById('campaigns-table-body-desktop');
+                    if (desktopTbody) {
+                        desktopTbody.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center">
+                                    <i class="fas fa-exclamation-triangle text-gray-400 text-2xl"></i>
+                                    <p class="text-gray-600 mt-2">Error loading campaigns</p>
+                                </td>
+                            </tr>
+                        `;
                     }
-                    const tbody = document.getElementById('campaigns-table-body');
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center">
-                                <i class="fas fa-exclamation-triangle text-yellow-400 text-2xl"></i>
-                                <p class="text-gray-600 mt-2">Campaign system not set up</p>
-                                <p class="text-sm text-gray-600 mt-1">Please run the setup script first</p>
-                            </td>
-                        </tr>
-                    `;
                 });
         }
 
@@ -571,18 +584,11 @@ if ($pdo) {
             const mobileContainer = document.getElementById('campaigns-table-body-mobile');
             
             if (campaigns.length === 0) {
-                // Show setup notice if no campaigns exist
-                const setupNotice = document.getElementById('setup-notice');
-                if (setupNotice) {
-                    setupNotice.style.display = 'block';
-                }
-                
                 desktopTbody.innerHTML = `
                     <tr>
                         <td colspan="6" class="px-6 py-12 text-center">
                             <i class="fas fa-bullhorn text-gray-600 text-2xl"></i>
                             <p class="text-gray-600 mt-2">No campaigns found</p>
-                            <p class="text-gray-600 mt-1">Set up the campaign system to get started</p>
                         </td>
                     </tr>
                 `;
@@ -590,17 +596,11 @@ if ($pdo) {
                     <div class="p-6 text-center">
                         <i class="fas fa-bullhorn text-gray-600 text-2xl"></i>
                         <p class="text-gray-600 mt-2">No campaigns found</p>
-                        <p class="text-gray-600 mt-1">Set up the campaign system to get started</p>
                     </div>
                 `;
                 return;
             }
             
-            // Hide setup notice if campaigns exist
-            const setupNotice = document.getElementById('setup-notice');
-            if (setupNotice) {
-                setupNotice.style.display = 'none';
-            }
 
             // Desktop table
             desktopTbody.innerHTML = campaigns.map(campaign => {
@@ -906,6 +906,8 @@ if ($pdo) {
 
         function previewRecipients() {
             const formData = new FormData(document.getElementById('campaign-form'));
+            const payload = Object.fromEntries(formData);
+            payload.tags = formData.getAll('tags[]');
             
             fetch('api/campaigns.php', {
                 method: 'POST',
@@ -914,7 +916,7 @@ if ($pdo) {
                 },
                 body: JSON.stringify({
                     action: 'preview_recipients',
-                    target_audience: Object.fromEntries(formData)
+                    target_audience: payload
                 })
             })
             .then(response => response.json())
@@ -1061,7 +1063,15 @@ if ($pdo) {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    showSuccess('Campaign created successfully');
+                    const sentCount = Number(data.sent_count || 0);
+                    const failedCount = Number(data.failed_count || 0);
+                    const recipientCount = Number(data.recipient_count || 0);
+
+                    if (recipientCount > 0) {
+                        showSuccess(`Campaign sent: ${sentCount}/${recipientCount} delivered${failedCount ? `, ${failedCount} failed` : ''}.`);
+                    } else {
+                        showSuccess(data.message || 'Campaign created successfully');
+                    }
                     closeCreateCampaignModal();
                     loadCampaigns();
                 } else {
@@ -1100,7 +1110,10 @@ if ($pdo) {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    showSuccess('Campaign sent successfully');
+                    const sentCount = Number(data.sent_count || 0);
+                    const failedCount = Number(data.failed_count || 0);
+                    const recipientCount = Number(data.recipient_count || 0);
+                    showSuccess(`Campaign sent: ${sentCount}/${recipientCount} delivered${failedCount ? `, ${failedCount} failed` : ''}.`);
                     loadCampaigns();
                 } else {
                     showError(data.message || 'Error sending campaign');

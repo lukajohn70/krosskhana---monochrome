@@ -1,8 +1,8 @@
 <?php
-require_once 'config.php';
-require_once 'email-helper.php';
-require_once 'email-templates.php';
-require_once 'notification-config.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/email-helper.php';
+require_once __DIR__ . '/email-templates.php';
+require_once __DIR__ . '/notification-config.php';
 
 /**
  * Form Notification System
@@ -11,13 +11,13 @@ require_once 'notification-config.php';
 class FormNotificationSystem {
     private $pdo;
     private $emailHelper;
-    private $adminEmail;
+    private $adminEmails;
     private $noreplyEmail;
     
     public function __construct($pdo) {
         $this->pdo = $pdo;
         $this->emailHelper = new EmailHelper($pdo);
-        $this->adminEmail = getAdminNotificationEmail();
+        $this->adminEmails = getAdminNotificationEmails($pdo);
         $this->noreplyEmail = getNoreplyEmail();
     }
     
@@ -31,10 +31,14 @@ class FormNotificationSystem {
         ];
         
         // Send confirmation email to user
-        $result['user_confirmation'] = $this->sendContactConfirmation($formData);
+        if (isUserConfirmationsEnabled()) {
+            $result['user_confirmation'] = $this->sendContactConfirmation($formData);
+        }
         
         // Send notification email to admin
-        $result['admin_notification'] = $this->sendContactAdminNotification($formData);
+        if (isAdminNotificationsEnabled()) {
+            $result['admin_notification'] = $this->sendContactAdminNotification($formData);
+        }
         
         return $result;
     }
@@ -49,10 +53,14 @@ class FormNotificationSystem {
         ];
         
         // Send welcome email to user
-        $result['user_confirmation'] = $this->sendNewsletterConfirmation($formData);
+        if (isUserConfirmationsEnabled()) {
+            $result['user_confirmation'] = $this->sendNewsletterConfirmation($formData);
+        }
         
         // Send notification email to admin
-        $result['admin_notification'] = $this->sendNewsletterAdminNotification($formData);
+        if (isAdminNotificationsEnabled()) {
+            $result['admin_notification'] = $this->sendNewsletterAdminNotification($formData);
+        }
         
         return $result;
     }
@@ -115,6 +123,7 @@ class FormNotificationSystem {
             $email,
             'Thank you for contacting Krosskhana - We\'ll get back to you soon!',
             $emailContent,
+            EMAIL_FROM_NAME,
             $this->noreplyEmail
         );
     }
@@ -191,11 +200,9 @@ class FormNotificationSystem {
             'New contact inquiry from ' . $name
         );
         
-        return $this->emailHelper->sendEmail(
-            $this->adminEmail,
+        return $this->sendAdminNotification(
             '🚨 New Contact Form Submission - ' . $subject,
-            $emailContent,
-            $this->noreplyEmail
+            $emailContent
         );
     }
     
@@ -216,6 +223,7 @@ class FormNotificationSystem {
             $email,
             'Welcome to Krosskhana Newsletter!',
             $emailContent,
+            EMAIL_FROM_NAME,
             $this->noreplyEmail
         );
     }
@@ -274,11 +282,9 @@ class FormNotificationSystem {
             'New subscriber: ' . $name
         );
         
-        return $this->emailHelper->sendEmail(
-            $this->adminEmail,
+        return $this->sendAdminNotification(
             '🎉 New Newsletter Subscriber - ' . $name,
-            $emailContent,
-            $this->noreplyEmail
+            $emailContent
         );
     }
     
@@ -305,10 +311,14 @@ class FormNotificationSystem {
         ];
         
         // Send confirmation email to user
-        $result['user_confirmation'] = $this->sendGeneralConfirmation($formData, $formType);
+        if (isUserConfirmationsEnabled()) {
+            $result['user_confirmation'] = $this->sendGeneralConfirmation($formData, $formType);
+        }
         
         // Send notification email to admin
-        $result['admin_notification'] = $this->sendGeneralAdminNotification($formData, $formType);
+        if (isAdminNotificationsEnabled()) {
+            $result['admin_notification'] = $this->sendGeneralAdminNotification($formData, $formType);
+        }
         
         return $result;
     }
@@ -355,6 +365,7 @@ class FormNotificationSystem {
             $email,
             'Thank you for your ' . ucfirst($formType) . ' submission - Krosskhana',
             $emailContent,
+            EMAIL_FROM_NAME,
             $this->noreplyEmail
         );
     }
@@ -409,12 +420,26 @@ class FormNotificationSystem {
             'New ' . $formType . ' submission from ' . $name
         );
         
-        return $this->emailHelper->sendEmail(
-            $this->adminEmail,
+        return $this->sendAdminNotification(
             '📝 New ' . ucfirst($formType) . ' Form Submission - ' . $name,
-            $emailContent,
-            $this->noreplyEmail
+            $emailContent
         );
+    }
+
+    private function sendAdminNotification($subject, $emailContent) {
+        $sent = false;
+
+        foreach ($this->adminEmails as $adminEmail) {
+            $sent = $this->emailHelper->sendEmail(
+                $adminEmail,
+                $subject,
+                $emailContent,
+                EMAIL_FROM_NAME,
+                $this->noreplyEmail
+            ) || $sent;
+        }
+
+        return $sent;
     }
 }
 ?>

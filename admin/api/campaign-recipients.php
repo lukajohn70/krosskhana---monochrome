@@ -1,5 +1,6 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Check if admin is logged in
 requireAdminAuth();
@@ -62,7 +63,7 @@ function handleGetRecipients($pdo, $params) {
             LEFT JOIN newsletter_subscriptions ns ON cr.subscriber_id = ns.id 
             $whereClause 
             ORDER BY cr.created_at DESC 
-            LIMIT ? OFFSET ?";
+            LIMIT $limit OFFSET $offset";
     
     $queryParams[] = $limit;
     $queryParams[] = $offset;

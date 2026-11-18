@@ -1,17 +1,5 @@
 {
-    "name": "krosskhana/website",
-    "description": "Krosskhana Automotive Lifestyle Website",
-    "type": "project",
     "require": {
-        "phpmailer/phpmailer": "^6.8"
-    },
-    "autoload": {
-        "psr-4": {
-            "Krosskhana\\": "src/"
-        }
+        "phpmailer/phpmailer": "^6.10"
     }
 }
-
-
-
-

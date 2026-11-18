@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if already logged in
 if (isAdminLoggedIn()) {
@@ -8,39 +9,46 @@ if (isAdminLoggedIn()) {
 }
 
 $error = '';
+$successMessage = '';
+$identifier = '';
+
+if (isset($_GET['error']) && $_GET['error'] === 'auth_required') {
+    $error = 'Please sign in to continue to the admin dashboard.';
+}
+
+if (isset($_GET['reset']) && $_GET['reset'] === 'success') {
+    $successMessage = 'Your password has been reset successfully. Please sign in with your new password.';
+}
 
 // Handle login form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = sanitizeInput($_POST['username'] ?? '');
+    $identifier = sanitizeInput($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     
-    if (empty($username) || empty($password)) {
-        $error = 'Please enter both username and password.';
+    if (empty($identifier) || empty($password)) {
+        $error = 'Please enter your email or username and password.';
     } else {
-        $pdo = getDBConnection();
-        if ($pdo) {
-            $stmt = $pdo->prepare("SELECT * FROM admin_users WHERE username = ? AND is_active = 1");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch();
+        // Use the authentication function
+        $user = verifyAdminCredentials($identifier, $password);
+        
+        if ($user) {
+            // Check if 2FA setup is required (first-time sign-in or not yet configured)
+            $mustSetup2FA = ($user['must_setup_2fa'] == 1 || empty($user['two_factor_enabled']) || empty($user['two_factor_secret']));
             
-            if ($user && password_verify($password, $user['password_hash'])) {
-                // Update last login
-                $updateStmt = $pdo->prepare("UPDATE admin_users SET last_login = NOW() WHERE id = ?");
-                $updateStmt->execute([$user['id']]);
-                
-                // Set session
-                $_SESSION['admin_logged_in'] = true;
-                $_SESSION['admin_user_id'] = $user['id'];
-                $_SESSION['admin_username'] = $user['username'];
-                $_SESSION['admin_role'] = $user['role'];
-                
-                header('Location: index.php');
+            $_SESSION['admin_2fa_pending'] = true;
+            $_SESSION['admin_2fa_user_id'] = $user['id'];
+            
+            if ($mustSetup2FA) {
+                $_SESSION['admin_2fa_action'] = 'setup';
+                header('Location: setup-2fa.php');
                 exit;
             } else {
-                $error = 'Invalid username or password.';
+                $_SESSION['admin_2fa_action'] = 'verify';
+                header('Location: verify-2fa.php');
+                exit;
             }
         } else {
-            $error = 'Database connection error. Please try again.';
+            $error = 'Invalid email/username or password.';
         }
     }
 }
@@ -130,8 +138,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- Login Form -->
             <div class="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/20">
+                <?php if ($successMessage): ?>
+                    <div class="mb-4 bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 px-4 py-3 rounded-xl relative flex items-start gap-3" role="alert">
+                        <i class="fas fa-check-circle text-lg mt-0.5"></i>
+                        <span class="block sm:inline"><?php echo htmlspecialchars($successMessage); ?></span>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($error): ?>
-                    <div class="mb-4 bg-gray-100 border border-gray-400 text-gray-700 px-4 py-3 rounded relative" role="alert">
+                    <div class="mb-4 bg-red-500/20 border border-red-500/40 text-red-200 px-4 py-3 rounded-xl relative flex items-start gap-3" role="alert">
+                        <i class="fas fa-exclamation-circle text-lg mt-0.5"></i>
                         <span class="block sm:inline"><?php echo htmlspecialchars($error); ?></span>
                     </div>
                 <?php endif; ?>
@@ -139,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <form class="space-y-6" method="POST">
                     <div>
                         <label for="username" class="block text-sm font-medium text-gray-300">
-                            Username
+                            Email or Username
                         </label>
                         <div class="mt-1 relative">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -147,14 +163,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                             <input id="username" name="username" type="text" required 
                                 class="appearance-none relative block w-full pl-10 pr-3 py-3 border border-white/20 rounded-lg placeholder-gray-400 text-white bg-white/10 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all duration-300"
-                                placeholder="Enter your username">
+                                value="<?php echo htmlspecialchars($identifier); ?>"
+                                placeholder="Enter your email or username">
                         </div>
                     </div>
 
                     <div>
-                        <label for="password" class="block text-sm font-medium text-gray-300">
-                            Password
-                        </label>
+                        <div class="flex items-center justify-between">
+                            <label for="password" class="block text-sm font-medium text-gray-300">
+                                Password
+                            </label>
+                            <a href="forgot-password.php" class="text-xs text-gray-400 hover:text-white transition">
+                                Forgot password?
+                            </a>
+                        </div>
                         <div class="mt-1 relative">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <i class="fas fa-lock text-gray-400"></i>
@@ -176,17 +198,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </form>
 
-                <!-- Demo Credentials -->
-                <div class="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700 hover:bg-gray-700/50 transition-colors duration-300">
-                    <h4 class="text-sm font-medium text-gray-300 mb-2 flex items-center">
-                        <i class="fas fa-info-circle mr-2 text-gray-400"></i>
-                        Demo Credentials:
-                    </h4>
-                    <div class="text-xs text-gray-400 space-y-1">
-                        <p class="flex items-center"><i class="fas fa-user mr-2 text-gray-500"></i><strong>Username:</strong> admin</p>
-                        <p class="flex items-center"><i class="fas fa-lock mr-2 text-gray-500"></i><strong>Password:</strong> krosskhana2024</p>
-                    </div>
-                </div>
             </div>
 
             <!-- Footer -->

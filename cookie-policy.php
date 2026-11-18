@@ -6,46 +6,32 @@ require_once 'includes/config.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cookie Policy - Krosskhana Avant Garde</title>
-    <meta name="description" content="Cookie Policy for Krosskhana Avant Garde - Learn about how we use cookies and how you can manage your cookie preferences.">
-    
+    <title>Cookie Policy - Krosskhana Motorsports</title>
+        <meta name="description" content="Cookie Policy for Krosskhana Motorsports - Learn about how we use cookies and how you can manage your cookie preferences.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/logos/Krosskhana-05.png">
+    <link rel="shortcut icon" type="image/png" href="assets/logos/Krosskhana-05.png">
+    <link rel="apple-touch-icon" href="assets/logos/Krosskhana-05.png">
+
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="font-poppins bg-gray-50">
-    <!-- Navigation Bar -->
-    <nav class="bg-black/20 backdrop-blur-xl border-b border-white/10 p-4 fixed w-full z-50 top-0 transition-all duration-500 shadow-2xl">
-        <div class="container mx-auto flex justify-between items-center py-2 px-4 md:px-0">
-            <!-- Logo -->
-            <div class="flex items-center space-x-4">
-                <a href="index.php" class="relative group cursor-pointer">
-                    <img src="assets/images/krosskhana.png" alt="Krosskhana Logo" class="h-14 w-auto transition-transform duration-300 group-hover:scale-110" />
-                    <div class="absolute inset-0 bg-gradient-to-r from-white to-gray-300 rounded-lg opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
-                </a>
-            </div>
-            
-            <!-- Back to Home -->
-            <a href="index.php" class="text-white hover:text-gray-300 transition-colors duration-300 flex items-center gap-2">
-                <i class="fas fa-arrow-left"></i>
-                <span>Back to Home</span>
-            </a>
-        </div>
-    </nav>
-
     <!-- Main Content -->
-    <div class="pt-24 pb-16">
+    <div class="pt-16 pb-16">
         <div class="container mx-auto px-4 max-w-4xl">
             <!-- Header -->
-            <div class="text-center mb-12">
+            <div class="text-center mb-12 mt-16">
                 <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-600 to-gray-800 mb-6">
                     Cookie Policy
                 </h1>
@@ -57,7 +43,7 @@ require_once 'includes/config.php';
             <div class="bg-white rounded-2xl shadow-xl p-8 md:p-12">
                 <div class="prose prose-lg max-w-none">
                     <p class="text-gray-600 mb-8">
-                        This Cookie Policy explains how Krosskhana Avant Garde uses cookies and similar technologies to recognize you when you visit our website. It explains what these technologies are and why we use them, as well as your rights to control our use of them.
+                        This Cookie Policy explains how Krosskhana Motorsports uses cookies and similar technologies to recognize you when you visit our website. It explains what these technologies are and why we use them, as well as your rights to control our use of them.
                     </p>
 
                     <h2 class="text-2xl font-bold text-gray-800 mb-4">1. What Are Cookies?</h2>
@@ -66,7 +52,7 @@ require_once 'includes/config.php';
                             Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are widely used by website owners to make their websites work, or to work more efficiently, as well as to provide reporting information.
                         </p>
                         <p class="text-gray-600">
-                            Cookies set by the website owner (in this case, Krosskhana Avant Garde) are called "first-party cookies." Cookies set by parties other than the website owner are called "third-party cookies." Third-party cookies enable third-party features or functionality to be provided on or through the website.
+                            Cookies set by the website owner (in this case, Krosskhana Motorsports) are called "first-party cookies." Cookies set by parties other than the website owner are called "third-party cookies." Third-party cookies enable third-party features or functionality to be provided on or through the website.
                         </p>
                     </div>
 
@@ -227,19 +213,23 @@ require_once 'includes/config.php';
     </div>
 
     <!-- Footer -->
-    <footer class="bg-gray-900 text-white py-8">
+    <footer class="bg-gray-900 text-white py-16">
         <div class="container mx-auto px-4 text-center">
-            <p class="text-gray-400">&copy; <?php echo date('Y'); ?> Krosskhana Avant Garde. All rights reserved.</p>
+            <!-- Back to Home Button -->
+            <div class="mb-8">
+                <a href="index.php" class="bg-gray-600 hover:bg-gray-500 text-white transition-all duration-300 flex items-center gap-2 px-6 py-3 rounded-lg shadow-lg mx-auto w-fit">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Back to Home</span>
+                </a>
+            </div>
+
+            <!-- Copyright -->
+                                    <p class="text-gray-400 text-sm">&copy; <?php echo date('Y'); ?> <span class="text-white font-semibold">Krosskhana Motorsports</span>. All rights reserved.</p>
         </div>
     </footer>
 
-    <!-- JavaScript -->
-    <script src="assets/js/main.js"></script>
     <script>
-        function openCookieSettings() {
-            // This would typically open a cookie consent management interface
-            alert('Cookie settings panel would open here. In a real implementation, this would show a modal with cookie preferences.');
-        }
+        // Add any JavaScript functionality here if needed
     </script>
 </body>
 </html>

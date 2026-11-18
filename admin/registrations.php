@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -281,7 +282,7 @@ if ($pdo) {
     </div>
 
     <!-- Status Update Modal -->
-    <div id="status-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+               <div id="status-modal" class="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-2xl rounded-2xl bg-white/95 backdrop-blur-xl border-gray-200/50">
             <div class="mt-3">
                 <h3 class="text-lg font-medium text-gray-900 mb-4 font-orbitron">Update Registration Status</h3>
@@ -342,14 +343,33 @@ if ($pdo) {
                 status: currentStatus
             });
 
-            fetch(`api/registrations.php?${params}`)
-                .then(response => response.json())
+            fetch(`api/registrations.php?${params}`, { headers: { 'Accept': 'application/json' } })
+                .then(async (response) => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            // Not authenticated: redirect to login
+                            window.location.href = 'login.php';
+                            return Promise.reject(new Error('Unauthorized'));
+                        }
+                        const text = await response.text();
+                        console.error('Non-OK response:', response.status, text);
+                        throw new Error('Request failed');
+                    }
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json')) {
+                        const text = await response.text();
+                        console.error('Expected JSON, got:', contentType, text);
+                        throw new Error('Invalid response type');
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    if (data.status === 'success') {
+                    if (data && data.status === 'success') {
                         renderRegistrationsTable(data.data);
                         renderPagination(data.pagination);
                     } else {
-                        showError('Error loading registrations data');
+                        console.error('API error payload:', data);
+                        showError(data?.message || 'Error loading registrations data');
                     }
                 })
                 .catch(error => {
@@ -417,45 +437,85 @@ if ($pdo) {
                 </tr>
             `).join('');
 
-            // Mobile cards
+            // Mobile cards - Enhanced for better mobile viewing
             mobileContainer.innerHTML = registrations.map(reg => `
-                <div class="p-4 border-b border-gray-200 last:border-b-0">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="font-semibold text-gray-900 text-sm">${reg.full_name}</h3>
-                        <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(reg.status)}">
-                            ${reg.status}
-                        </span>
-                    </div>
-                    <div class="space-y-2 text-sm text-gray-600">
-                        <div class="flex items-center">
-                            <i class="fas fa-user w-4 mr-2 text-gray-400"></i>
-                            <span>${reg.racing_alias || 'No alias'}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-envelope w-4 mr-2 text-gray-400"></i>
-                            <span>${reg.email}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-phone w-4 mr-2 text-gray-400"></i>
-                            <span>${reg.phone}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-trophy w-4 mr-2 text-gray-400"></i>
-                            <span>${getExperienceLevel(reg)}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-car w-4 mr-2 text-gray-400"></i>
-                            <span>${reg.vehicle_make} ${reg.vehicle_model}</span>
-                        </div>
-                        <div class="flex items-center">
-                            <i class="fas fa-calendar w-4 mr-2 text-gray-400"></i>
-                            <span>${new Date(reg.created_at).toLocaleDateString()}</span>
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4 overflow-hidden">
+                    <!-- Header with name and status -->
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div class="min-w-0 flex-1">
+                                <h3 class="font-semibold text-gray-900 text-base truncate">${reg.full_name}</h3>
+                                ${reg.racing_alias ? `<p class="text-sm text-gray-600 truncate">${reg.racing_alias}</p>` : ''}
+                            </div>
+                            <span class="px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(reg.status)} flex-shrink-0 ml-3">
+                                ${reg.status}
+                            </span>
                         </div>
                     </div>
-                    <div class="flex space-x-3 mt-4">
-                        <button onclick="viewRegistration(${reg.id})" class="text-gray-500 hover:text-gray-900 text-sm transition-colors duration-300">View</button>
-                        <button onclick="updateStatus(${reg.id})" class="text-gray-500 hover:text-gray-900 text-sm transition-colors duration-300">Update</button>
-                        <button onclick="deleteRegistration(${reg.id})" class="text-gray-600 hover:text-gray-500 text-sm transition-colors duration-300">Delete</button>
+                    
+                    <!-- Content section -->
+                    <div class="p-4 space-y-3">
+                        <!-- Contact Info -->
+                        <div class="flex items-start">
+                            <i class="fas fa-envelope w-5 h-5 mr-3 text-gray-400 mt-0.5 flex-shrink-0"></i>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-gray-600 break-all">${reg.email}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start">
+                            <i class="fas fa-phone w-5 h-5 mr-3 text-gray-400 mt-0.5 flex-shrink-0"></i>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-gray-600">${reg.phone}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Experience Level -->
+                        <div class="flex items-start">
+                            <i class="fas fa-trophy w-5 h-5 mr-3 text-gray-400 mt-0.5 flex-shrink-0"></i>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-gray-600">${getExperienceLevel(reg)}</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Vehicle Info -->
+                        ${reg.vehicle_make || reg.vehicle_model ? `
+                        <div class="flex items-start">
+                            <i class="fas fa-car w-5 h-5 mr-3 text-gray-400 mt-0.5 flex-shrink-0"></i>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-gray-600">${reg.vehicle_make || ''} ${reg.vehicle_model || ''}</p>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Date -->
+                        <div class="flex items-start">
+                            <i class="fas fa-calendar w-5 h-5 mr-3 text-gray-400 mt-0.5 flex-shrink-0"></i>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm text-gray-600">Registered: ${new Date(reg.created_at).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action buttons -->
+                    <div class="bg-gray-50 px-4 py-3 border-t border-gray-200">
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <button onclick="viewRegistration(${reg.id})" 
+                                class="flex-1 px-3 py-2 text-sm font-medium bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors duration-300">
+                                <i class="fas fa-eye mr-2"></i>
+                                View
+                            </button>
+                            <button onclick="updateStatus(${reg.id})" 
+                                class="flex-1 px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors duration-300">
+                                <i class="fas fa-edit mr-2"></i>
+                                Update
+                            </button>
+                            <button onclick="deleteRegistration(${reg.id})" 
+                                class="flex-1 px-3 py-2 text-sm font-medium bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors duration-300">
+                                <i class="fas fa-trash mr-2"></i>
+                                Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -483,9 +543,12 @@ if ($pdo) {
             const paginationContainer = document.getElementById('pagination');
             if (!pagination || !paginationContainer) return;
 
-            const { current_page, total_pages, total_records, per_page } = pagination;
-            const startRecord = (current_page - 1) * per_page + 1;
-            const endRecord = Math.min(current_page * per_page, total_records);
+            const current_page = Number(pagination.current_page || 1);
+            const total_pages = Number(pagination.total_pages || 1);
+            const per_page = Number(pagination.per_page || 10);
+            const total_records = Number((pagination.total !== undefined ? pagination.total : pagination.total_records) || 0);
+            const startRecord = total_records > 0 ? ((current_page - 1) * per_page + 1) : 0;
+            const endRecord = total_records > 0 ? Math.min(current_page * per_page, total_records) : 0;
 
             let paginationHTML = `
                 <div class="flex items-center justify-between">

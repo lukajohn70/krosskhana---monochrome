@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once 'includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -215,7 +216,8 @@ if ($pdo) {
                                 
                                 <div>
                                     <label for="smtp-password" class="block text-sm font-medium text-gray-700 mb-2">SMTP Password</label>
-                                    <input type="password" id="smtp-password" name="smtp_password" required
+                                    <input type="password" id="smtp-password" name="smtp_password"
+                                        placeholder="Leave blank to keep current password"
                                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500">
                                 </div>
                                 
@@ -271,7 +273,7 @@ if ($pdo) {
     </div>
 
     <!-- Success/Error Messages -->
-    <div id="message-container" class="fixed top-4 right-4 z-50 hidden">
+                    <div id="message-container" class="fixed top-4 right-4 z-50 hidden">
         <div id="message" class="px-6 py-4 rounded-lg shadow-lg max-w-md">
             <div class="flex items-center">
                 <i id="message-icon" class="mr-3"></i>

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/config.php';
 /**
  * Notification System Configuration
  * 
@@ -7,7 +8,7 @@
 
 // Admin notification email address
 // Change this to your preferred email address to receive admin notifications
-define('ADMIN_NOTIFICATION_EMAIL', 'lukajohn70@gmail.com');
+define('ADMIN_NOTIFICATION_EMAIL', 'info@krosskhana.org');
 
 // Noreply email address for user confirmations
 // This should be a valid email address that users can't reply to
@@ -32,8 +33,28 @@ define('LOG_EMAIL_ERRORS', true);         // Log email sending errors
 /**
  * Get admin notification email
  */
-function getAdminNotificationEmail() {
-    return ADMIN_NOTIFICATION_EMAIL;
+function getAdminNotificationEmails($pdo = null) {
+    $emails = [];
+
+    if ($pdo) {
+        try {
+            $stmt = $pdo->query("SELECT email FROM admin_users WHERE is_active = 1 AND email IS NOT NULL AND email != ''");
+            $emails = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        } catch (PDOException $e) {
+            error_log("Failed to load admin notification emails: " . $e->getMessage());
+        }
+    }
+
+    $emails[] = ADMIN_NOTIFICATION_EMAIL;
+    $emails[] = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : ADMIN_NOTIFICATION_EMAIL;
+
+    $emails = array_values(array_unique(array_filter(array_map('trim', $emails))));
+    return $emails;
+}
+
+function getAdminNotificationEmail($pdo = null) {
+    $emails = getAdminNotificationEmails($pdo);
+    return $emails[0] ?? ADMIN_NOTIFICATION_EMAIL;
 }
 
 /**
@@ -78,5 +99,4 @@ function isErrorLoggingEnabled() {
     return LOG_EMAIL_ERRORS;
 }
 ?>
-
 

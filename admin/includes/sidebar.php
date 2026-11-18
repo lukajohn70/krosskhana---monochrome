@@ -11,7 +11,7 @@
             </div>
         </div>
         <div class="flex items-center space-x-2 lg:space-x-4">
-            <span class="text-gray-300 hidden lg:inline">Welcome, Admin</span>
+            <span class="text-gray-300 hidden lg:inline">Welcome, <?php echo htmlspecialchars(getCurrentAdminUsername() ?? 'Admin'); ?></span>
             <a href="logout.php" class="bg-gradient-to-r from-white to-gray-300 hover:from-gray-200 hover:to-gray-400 text-black px-2 py-1 lg:px-4 lg:py-2 rounded-lg text-xs lg:text-sm font-medium transition-all duration-300 transform hover:scale-105 shadow-lg">
                 <i class="fas fa-sign-out-alt mr-1 lg:mr-2"></i><span class="hidden sm:inline">Logout</span>
             </a>
@@ -42,6 +42,11 @@
             <a href="registrations.php" class="flex items-center px-3 py-2 lg:px-4 lg:py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg <?php echo basename($_SERVER['PHP_SELF']) == 'registrations.php' ? 'text-white bg-gray-800/50 border border-gray-700/50' : ''; ?>">
                 <i class="fas fa-car mr-2 lg:mr-3 text-sm lg:text-base"></i>
                 <span class="font-medium text-sm lg:text-base">Registrations</span>
+            </a>
+            
+            <a href="events.php" class="flex items-center px-3 py-2 lg:px-4 lg:py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg <?php echo basename($_SERVER['PHP_SELF']) == 'events.php' ? 'text-white bg-gray-800/50 border border-gray-700/50' : ''; ?>">
+                <i class="fas fa-calendar-alt mr-2 lg:mr-3 text-sm lg:text-base"></i>
+                <span class="font-medium text-sm lg:text-base">Events</span>
             </a>
             
             <a href="contact.php" class="flex items-center px-3 py-2 lg:px-4 lg:py-3 text-gray-300 rounded-lg transition-all duration-300 hover:bg-gray-800/50 hover:text-white hover:shadow-lg <?php echo basename($_SERVER['PHP_SELF']) == 'contact.php' ? 'text-white bg-gray-800/50 border border-gray-700/50' : ''; ?>">

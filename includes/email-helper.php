@@ -1,6 +1,11 @@
 <?php
-require_once 'config.php';
-require_once 'email-templates.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/email-templates.php';
+
+$autoloadPath = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+}
 
 /**
  * Email Helper Class
@@ -22,29 +27,8 @@ class EmailHelper {
      * Check if we're in development mode
      */
     public function isDevelopmentMode() {
-        // Force production mode for email sending
-        // Set this to false to ensure emails are always sent
+        // Production mode - always send emails
         return false;
-        
-        // Original development detection (commented out)
-        /*
-        $host = $_SERVER['HTTP_HOST'] ?? '';
-        $serverName = $_SERVER['SERVER_NAME'] ?? '';
-        
-        // More specific development detection
-        $isLocalhost = in_array($host, ['localhost', '127.0.0.1', '::1']) || 
-                      strpos($host, 'localhost:') === 0 || 
-                      strpos($host, '127.0.0.1:') === 0;
-        
-        $isLocalDomain = strpos($host, '.local') !== false || 
-                        strpos($serverName, '.local') !== false;
-        
-        $isMamp = strpos($host, 'krosskhana') !== false && 
-                  (strpos($host, 'localhost') !== false || strpos($host, '127.0.0.1') !== false);
-        
-        // For production, we want to send emails, so be more restrictive about dev mode
-        return $isLocalhost && !$isMamp;
-        */
     }
     
     /**
@@ -67,16 +51,10 @@ class EmailHelper {
      * Send email using PHPMailer with SMTP
      */
     public function sendEmail($to, $subject, $content, $fromName = null, $fromEmail = null) {
-        $fromName = $fromName ?: $this->settings['from_name'] ?? 'Krosskhana';
-        $fromEmail = $fromEmail ?: $this->settings['from_email'] ?? 'info@krosskhana.org';
+        $fromName = $fromName ?: $this->getSettingValue('from_name', defined('FROM_NAME') ? FROM_NAME : 'Krosskhana');
+        $fromEmail = $fromEmail ?: $this->getSettingValue('from_email', defined('FROM_EMAIL') ? FROM_EMAIL : 'info@krosskhana.org');
         
-        // In development mode, just log the email instead of sending
-        if ($this->isDevelopment) {
-            error_log("DEVELOPMENT MODE - Email would be sent to: $to");
-            error_log("DEVELOPMENT MODE - Subject: $subject");
-            error_log("DEVELOPMENT MODE - Message: " . substr($content, 0, 200) . "...");
-            return true; // Return true to simulate successful email sending
-        }
+
         
         // Check if PHPMailer is available
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
@@ -96,26 +74,39 @@ class EmailHelper {
             
             // Server settings
             $mail->isSMTP();
-            $mail->Host = $this->settings['smtp_host'] ?? 'mail.krosskhana.org';
-            $mail->SMTPAuth = true;
-            $mail->Username = $this->settings['smtp_username'] ?? 'info@krosskhana.org';
-            $mail->Password = $this->settings['smtp_password'] ?? '';
-            $mail->SMTPSecure = $this->settings['smtp_encryption'] ?? 'ssl';
-            $mail->Port = $this->settings['smtp_port'] ?? 465;
+            $mail->Host = $this->getSettingValue('smtp_host', defined('SMTP_HOST') ? SMTP_HOST : 'mail.krosskhana.org');
+            $mail->Port = (int) $this->getSettingValue('smtp_port', defined('SMTP_PORT') ? SMTP_PORT : 465);
+            $mail->Username = $this->getSettingValue('smtp_username', defined('SMTP_USERNAME') ? SMTP_USERNAME : '');
+            $mail->Password = $this->getSettingValue('smtp_password', defined('SMTP_PASSWORD') ? SMTP_PASSWORD : '');
+            $mail->SMTPAuth = $mail->Username !== '' && $mail->Password !== '';
+
+            $smtpEncryption = strtolower((string) $this->getSettingValue('smtp_encryption', defined('SMTP_SECURE') ? SMTP_SECURE : 'ssl'));
+            if ($smtpEncryption === 'tls') {
+                $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+            } elseif ($smtpEncryption === 'ssl') {
+                $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+            } else {
+                $mail->SMTPSecure = false;
+                $mail->SMTPAutoTLS = false;
+            }
             
             // Timeout settings to prevent hanging (like JLM)
-            $mail->Timeout = 10; // 10 seconds timeout
+            $mail->Timeout = 20;
             $mail->SMTPKeepAlive = false; // Don't keep connection alive
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
             
-            // Enable debug output in development
-            if ($this->isDevelopment) {
-                $mail->SMTPDebug = 2; // Enable verbose debug output
-            }
+
             
             // Recipients
             $mail->setFrom($fromEmail, $fromName);
             $mail->addAddress($to);
-            $mail->addReplyTo($this->settings['reply_to_email'] ?? 'info@krosskhana.org');
+            $mail->addReplyTo($this->getSettingValue('reply_to_email', defined('REPLY_TO_EMAIL') ? REPLY_TO_EMAIL : 'info@krosskhana.org'));
             
             // Content
             $mail->isHTML(true);
@@ -248,11 +239,24 @@ class EmailHelper {
         }
         $this->loadSettings(); // Reload settings
     }
+
+    private function getSettingValue($key, $fallback = null) {
+        $value = $this->settings[$key] ?? null;
+        if ($value === null) {
+            return $fallback;
+        }
+
+        if (is_string($value) && trim($value) === '') {
+            return $fallback;
+        }
+
+        return $value;
+    }
     
     /**
      * Test email configuration
      */
-    public function testConfiguration($testEmail = 'lukajohn70@gmail.com') {
+    public function testConfiguration($testEmail = 'info@krosskhana.org') {
         $subject = 'Email Configuration Test - ' . date('H:i:s');
         $content = '<h1>Email Configuration Test</h1><p>This is a test email to verify your email configuration is working correctly.</p>';
         
@@ -294,7 +298,7 @@ function sendCampaignEmail($pdo, $recipient, $campaign, $trackingToken) {
  * Get unsubscribe URL
  */
 function getUnsubscribeUrl($email) {
-    $baseUrl = getBaseUrl();
+    $baseUrl = getEmailBaseUrl();
     return $baseUrl . '/unsubscribe.php?email=' . urlencode($email);
 }
 
@@ -302,14 +306,14 @@ function getUnsubscribeUrl($email) {
  * Get web version URL
  */
 function getWebVersionUrl($campaignId) {
-    $baseUrl = getBaseUrl();
+    $baseUrl = getEmailBaseUrl();
     return $baseUrl . '/campaign-view.php?id=' . $campaignId;
 }
 
 /**
- * Get base URL
+ * Get base URL for email functions
  */
-function getBaseUrl() {
+function getEmailBaseUrl() {
     $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $path = dirname($_SERVER['SCRIPT_NAME'] ?? '');

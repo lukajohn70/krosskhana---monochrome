@@ -1,5 +1,7 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/email-utils.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Check if admin is logged in
 requireAdminAuth();
@@ -44,6 +46,11 @@ function getAllSettings($pdo) {
         
         $stmt = $pdo->query("SELECT setting_key, setting_value, description FROM email_settings ORDER BY setting_key");
         $settings = $stmt->fetchAll();
+        foreach ($settings as &$setting) {
+            if ($setting['setting_key'] === 'smtp_password') {
+                $setting['setting_value'] = '';
+            }
+        }
         
         sendJSONResponse([
             'status' => 'success',
@@ -67,11 +74,18 @@ function handleUpdateSettings($pdo, $data) {
             ], 404);
         }
         
+        $currentSettingsStmt = $pdo->query("SELECT setting_key, setting_value FROM email_settings");
+        $currentSettings = $currentSettingsStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $smtpPassword = $data['smtp_password'] ?? '';
+        if ($smtpPassword === '' && isset($currentSettings['smtp_password'])) {
+            $smtpPassword = $currentSettings['smtp_password'];
+        }
+
         $settings = [
             'smtp_host' => $data['smtp_host'] ?? '',
             'smtp_port' => $data['smtp_port'] ?? '587',
             'smtp_username' => $data['smtp_username'] ?? '',
-            'smtp_password' => $data['smtp_password'] ?? '',
+            'smtp_password' => $smtpPassword,
             'smtp_encryption' => $data['smtp_encryption'] ?? 'tls',
             'from_email' => $data['from_email'] ?? '',
             'from_name' => $data['from_name'] ?? '',
@@ -155,24 +169,13 @@ function handlePasswordChange($pdo, $data) {
 
 function handleEmailTest($pdo, $data) {
     try {
-        // Get email settings from database
-        $stmt = $pdo->query("SELECT setting_key, setting_value FROM email_settings");
-        $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
-        
-        if (empty($settings)) {
-            sendJSONResponse(['status' => 'error', 'message' => 'Email settings not found. Please configure email settings first.'], 400);
-        }
-        
-        // Test email configuration
-        require_once '../../includes/email-helper.php';
-        
+        require_once __DIR__ . '/../../includes/email-helper.php';
+
+        $emailHelper = new EmailHelper($pdo);
         $testEmail = $_SESSION['admin_email'] ?? 'test@example.com';
-        $subject = 'Krosskhana Admin - Email Test';
-        $message = 'This is a test email from the Krosskhana admin panel to verify email configuration.';
-        
-        $result = sendEmail($testEmail, $subject, $message);
-        
-        if ($result['success']) {
+        $result = $emailHelper->testConfiguration($testEmail);
+
+        if ($result) {
             sendJSONResponse([
                 'status' => 'success', 
                 'message' => 'Email test successful! Test email sent to ' . $testEmail
@@ -180,7 +183,7 @@ function handleEmailTest($pdo, $data) {
         } else {
             sendJSONResponse([
                 'status' => 'error', 
-                'message' => 'Email test failed: ' . $result['error']
+                'message' => 'Email test failed. Please review the SMTP host, port, encryption, and credentials.'
             ], 500);
         }
         

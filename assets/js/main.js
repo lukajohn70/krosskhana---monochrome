@@ -6,8 +6,29 @@ const totalVideos = 4;
 
 // Initialize all functionality when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    // Navbar positioning handled by CSS
+    ensureNavbarVisibility();
+    
+    // Initially hide navbar behind splash screen
+    const navbar = document.querySelector('nav');
+    if (navbar) {
+        navbar.style.opacity = '0';
+        navbar.style.visibility = 'hidden';
+    }
+    
     // Initialize splash screen first
     initSplashScreen();
+    
+    // Set initial navigation state to home
+    setTimeout(() => {
+        updateActiveNavigation('home');
+    }, 100);
+    
+    // Add function to reset splash screen for testing (can be removed in production)
+    window.resetSplashScreen = function() {
+        localStorage.removeItem('krosskhana_splash_seen');
+        location.reload();
+    };
     
     initNavigation();
     initForms();
@@ -19,7 +40,50 @@ document.addEventListener('DOMContentLoaded', function() {
     initScrollBasedNavigation();
     initDropdownMenu();
     initCarousel();
+    
+    // Navbar is already fixed via CSS
+    
+    // Ensure navbar stays positioned on window resize
+    window.addEventListener('resize', ensureNavbarVisibility);
+    
+    // Continuously ensure navbar is visible during scrolling
+    window.addEventListener('scroll', ensureNavbarVisibility);
 });
+
+
+
+// Navbar positioning is now handled entirely by CSS
+
+// Additional navbar positioning insurance
+function ensureNavbarVisibility() {
+    const navbar = document.querySelector('nav');
+    if (navbar) {
+        // Force fixed positioning via JavaScript as backup
+        navbar.style.position = 'fixed';
+        navbar.style.top = '0';
+        navbar.style.left = '0';
+        navbar.style.right = '0';
+        navbar.style.width = '100%';
+        navbar.style.zIndex = '9999';
+        navbar.style.display = 'block';
+        navbar.style.transform = 'none';
+        
+        // Ensure it's above all other content
+        navbar.style.zIndex = '9999';
+        
+        // Force background and backdrop filter
+        navbar.style.background = 'rgba(0, 0, 0, 0.8)';
+        navbar.style.backdropFilter = 'blur(20px)';
+        navbar.style.webkitBackdropFilter = 'blur(20px)';
+        
+        // Prevent any hiding
+        navbar.style.clip = 'auto';
+        navbar.style.clipPath = 'none';
+        navbar.style.overflow = 'visible';
+        
+
+    }
+}
 
 // Navigation functionality
 function initNavigation() {
@@ -108,7 +172,7 @@ async function handleNewsBriefSubmit(e) {
     }
 
     try {
-        const response = await fetch('process-newsletter.php', {
+        const response = await fetch('forms/process-newsletter.php', {
             method: 'POST',
             body: formData
         });
@@ -144,7 +208,7 @@ async function handleContactSubmit(e) {
     }
 
     try {
-        const response = await fetch('process-contact.php', {
+        const response = await fetch('forms/process-contact.php', {
             method: 'POST',
             body: formData
         });
@@ -236,18 +300,12 @@ function showNotification(message, success, context) {
 
 // Smooth scroll to section
 function scrollToSection(sectionId) {
-    console.log('scrollToSection called with:', sectionId);
-    
     const element = document.getElementById(sectionId);
-    console.log('Element found:', element);
     
     if (element) {
-        console.log('Scrolling to element:', element);
-        
         // Get navbar height first
         const navbar = document.querySelector('nav');
         const navbarHeight = navbar ? navbar.offsetHeight : 80;
-        console.log('Navbar height:', navbarHeight);
         
         // Check if we're on mobile
         const isMobile = window.innerWidth <= 768;
@@ -264,8 +322,6 @@ function scrollToSection(sectionId) {
             targetPosition = elementTop - navbarHeight - 20;
         }
         
-        console.log('Target position:', targetPosition, 'isMobile:', isMobile);
-        
         // Scroll directly to the calculated position
         window.scrollTo({
             top: targetPosition,
@@ -277,8 +333,6 @@ function scrollToSection(sectionId) {
         
         // Close mobile menu if it's open
         closeMobileMenu();
-    } else {
-        console.error('Element not found for sectionId:', sectionId);
     }
 }
 
@@ -312,17 +366,22 @@ function initScrollBasedNavigation() {
         
         let currentSection = 'home';
         
-        sections.forEach(sectionId => {
-            const section = document.getElementById(sectionId);
-            if (section) {
-                const sectionTop = section.offsetTop;
-                const sectionHeight = section.offsetHeight;
-                
-                if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
-                    currentSection = sectionId;
+        // If we're at the very top of the page, always highlight home
+        if (window.scrollY < 100) {
+            currentSection = 'home';
+        } else {
+            sections.forEach(sectionId => {
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.offsetHeight;
+                    
+                    if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+                        currentSection = sectionId;
+                    }
                 }
-            }
-        });
+            });
+        }
         
         updateActiveNavigation(currentSection);
     });
@@ -334,6 +393,11 @@ function scrollToTop() {
         top: 0,
         behavior: 'smooth'
     });
+    
+    // Ensure home navigation is highlighted when scrolling to top
+    setTimeout(() => {
+        updateActiveNavigation('home');
+    }, 500);
 }
 
 // Initialize back to top button
@@ -503,13 +567,7 @@ function initEventTabs() {
     const upcomingEventsContent = document.getElementById('upcoming-events-content');
 
     if (pastEventsTab && upcomingEventsTab && pastEventsContent && upcomingEventsContent) {
-        // Debug logging
-        console.log('Event tabs initialized:', {
-            pastEventsTab: pastEventsTab,
-            upcomingEventsTab: upcomingEventsTab,
-            pastEventsContent: pastEventsContent,
-            upcomingEventsContent: upcomingEventsContent
-        });
+
         
         // Set initial state - Past Events should be active by default
         pastEventsTab.className = 'px-8 py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg';
@@ -517,14 +575,7 @@ function initEventTabs() {
         pastEventsContent.style.display = 'block';
         upcomingEventsContent.style.display = 'none';
         
-        console.log('Initial tab state set');
-    } else {
-        console.error('Event tab elements not found:', {
-            pastEventsTab: !!pastEventsTab,
-            upcomingEventsTab: !!upcomingEventsTab,
-            pastEventsContent: !!pastEventsContent,
-            upcomingEventsContent: !!upcomingEventsContent
-        });
+
     }
 }
 
@@ -538,203 +589,17 @@ function openEventGallery(eventId) {
 // Make functions globally accessible
 window.openEventGallery = openEventGallery;
 
-// Form opening function
-function openForm(formType) {
-    console.log('Opening form for:', formType);
-    
-    switch(formType) {
-        case 'corporate':
-            openCorporateForm();
-            break;
-        case 'racer':
-            openRacerForm();
-            break;
-        case 'sponsorship':
-            openSponsorshipForm();
-            break;
-        default:
-            showNotification('Opening form...', true, 'forms');
-    }
-}
 
-// Corporate Partnership Form
-function openCorporateForm() {
-    const modal = document.getElementById('corporate-form-modal');
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-}
 
-// Close corporate form
-function closeCorporateForm() {
-    const modal = document.getElementById('corporate-form-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
 
-// Racer Registration Form
-function openRacerForm() {
-    const modal = document.getElementById('racer-form-modal');
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-}
 
-// Close racer form
-function closeRacerForm() {
-    const modal = document.getElementById('racer-form-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
 
-// Sponsorship Form
-function openSponsorshipForm() {
-    const modal = document.getElementById('sponsorship-form-modal');
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-}
 
-// Close sponsorship form
-function closeSponsorshipForm() {
-    const modal = document.getElementById('sponsorship-form-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
 
-// Make form function globally accessible
-window.openForm = openForm;
-window.closeCorporateForm = closeCorporateForm;
-window.closeRacerForm = closeRacerForm;
-window.closeSponsorshipForm = closeSponsorshipForm;
 
-// Handle form submissions
-document.addEventListener('DOMContentLoaded', function() {
-    const corporateForm = document.getElementById('corporate-partnership-form');
-    if (corporateForm) {
-        corporateForm.addEventListener('submit', handleCorporateFormSubmit);
-    }
-    
-    const racerForm = document.getElementById('racer-registration-form');
-    if (racerForm) {
-        racerForm.addEventListener('submit', handleRacerFormSubmit);
-    }
-    
-    const sponsorshipForm = document.getElementById('sponsorship-form');
-    if (sponsorshipForm) {
-        sponsorshipForm.addEventListener('submit', handleSponsorshipFormSubmit);
-    }
-});
 
-async function handleCorporateFormSubmit(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    
-    // Validate required fields
-    const company = formData.get('company');
-    const contactPerson = formData.get('contact_person');
-    const email = formData.get('email');
-    const phone = formData.get('phone');
-    
-    if (!company || !contactPerson || !email || !phone) {
-        showNotification('Please fill in all required fields.', false, 'corporate');
-        return;
-    }
-    
-    try {
-        const response = await fetch('process-corporate.php', {
-            method: 'POST',
-            body: formData
-        });
 
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            showNotification(data.message, true, 'corporate');
-            e.target.reset();
-            closeCorporateForm();
-        } else {
-            showNotification(data.message, false, 'corporate');
-        }
-    } catch (error) {
-        showNotification('Failed to submit form. Please try again.', false, 'corporate');
-    }
-}
 
-async function handleRacerFormSubmit(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    
-    // Validate required fields
-    const fullName = formData.get('full_name');
-    const email = formData.get('email');
-    const phone = formData.get('phone');
-    
-    if (!fullName || !email || !phone) {
-        showNotification('Please fill in all required fields.', false, 'racer');
-        return;
-    }
-    
-    try {
-        const response = await fetch('process-registration.php', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            showNotification(data.message, true, 'racer');
-            e.target.reset();
-            closeRacerForm();
-        } else {
-            showNotification(data.message, false, 'racer');
-        }
-    } catch (error) {
-        showNotification('Failed to submit form. Please try again.', false, 'racer');
-    }
-}
-
-async function handleSponsorshipFormSubmit(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    
-    // Validate required fields
-    const organization = formData.get('organization');
-    const contactPerson = formData.get('contact_person');
-    const email = formData.get('email');
-    const phone = formData.get('phone');
-    
-    if (!organization || !contactPerson || !email || !phone) {
-        showNotification('Please fill in all required fields.', false, 'sponsorship');
-        return;
-    }
-    
-    try {
-        const response = await fetch('process-sponsorship.php', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            showNotification(data.message, true, 'sponsorship');
-            e.target.reset();
-            closeSponsorshipForm();
-        } else {
-            showNotification(data.message, false, 'sponsorship');
-        }
-    } catch (error) {
-        showNotification('Failed to submit form. Please try again.', false, 'sponsorship');
-    }
-}
 
 // Initialize splash screen functionality
 function initSplashScreen() {
@@ -745,32 +610,91 @@ function initSplashScreen() {
     const splashVideo = document.getElementById('splash-video');
     
     if (splashScreen && mainApp) {
+        // Check if user has seen the splash screen before
+        // Uses localStorage key: 'krosskhana_splash_seen'
+        const hasSeenSplash = localStorage.getItem('krosskhana_splash_seen');
+        
+        if (hasSeenSplash) {
+            // User has seen splash before, skip directly to main content
+            console.log('Splash screen skipped - user has seen it before');
+            skipSplashAndShowMain();
+            return;
+        }
+        
         let progressInterval;
+        
+        console.log('Showing splash screen - first time visit');
+        
+        // Fade in splash screen on page load with enhanced animation
+        setTimeout(() => {
+            splashScreen.style.opacity = '1';
+            splashScreen.classList.add('animate-splash-fade-in');
+        }, 100);
+        
+        // Staggered fade in for splash screen elements
+        setTimeout(() => {
+            if (skipButton) {
+                skipButton.style.opacity = '1';
+                skipButton.style.transform = 'translateY(0)';
+            }
+        }, 800);
+        
+        setTimeout(() => {
+            const progressContainer = document.querySelector('#splash-screen .absolute.bottom-8');
+            if (progressContainer) {
+                progressContainer.style.opacity = '1';
+                progressContainer.style.transform = 'translateY(0)';
+            }
+        }, 1200);
         
         // Start zoom out effect and progress bar after video loads
         if (splashVideo) {
             splashVideo.addEventListener('loadedmetadata', function() {
                 const videoDuration = splashVideo.duration;
-                const progressStep = 100 / (videoDuration * 20); // Update 20 times per second
                 
                 // Start zoom out effect
                 setTimeout(() => {
                     splashVideo.style.transform = 'scale(1)';
                 }, 100);
                 
-                // Progress bar animation based on video duration
-                let progress = 0;
-                progressInterval = setInterval(() => {
-                    progress += progressStep;
-                    if (progressBar) {
+                // Real-time progress bar sync with video timeline
+                const updateProgress = () => {
+                    if (splashVideo && progressBar) {
+                        const currentTime = splashVideo.currentTime;
+                        const progress = (currentTime / videoDuration) * 100;
+                        
+                        // Update progress bar
                         progressBar.style.width = Math.min(progress, 100) + '%';
+                        
+                        // Start homepage overlay 5 seconds before video ends
+                        if (currentTime >= videoDuration - 5 && !mainApp.classList.contains('overlay-active')) {
+                            startHomepageOverlay();
+                        }
+                        
+                        // Show overlay indicator when approaching the 5-second mark
+                        if (currentTime >= videoDuration - 6) {
+                            const overlayIndicator = document.getElementById('overlay-indicator');
+                            if (overlayIndicator) {
+                                overlayIndicator.style.opacity = '1';
+                            }
+                        }
+                        
+                        // Check if video has ended
+                        if (currentTime >= videoDuration) {
+                            clearInterval(progressInterval);
+                            completeTransition();
+                        }
                     }
-                    
-                    if (progress >= 100) {
-                        clearInterval(progressInterval);
-                        hideSplashScreen();
-                    }
-                }, 50); // Update every 50ms
+                };
+                
+                // Update progress bar every 50ms for very smooth animation
+                progressInterval = setInterval(updateProgress, 50);
+                
+                // Also listen for video end event as backup
+                splashVideo.addEventListener('ended', function() {
+                    clearInterval(progressInterval);
+                    completeTransition();
+                });
             });
         }
         
@@ -780,19 +704,183 @@ function initSplashScreen() {
                 if (progressInterval) {
                     clearInterval(progressInterval);
                 }
-                hideSplashScreen();
+                // Skip to complete transition immediately
+                skipToComplete();
             });
         }
         
-        // Hide splash screen function
-        function hideSplashScreen() {
+        // Function to skip splash and show main content directly
+        function skipSplashAndShowMain() {
+            // Mark splash as seen in localStorage
+            localStorage.setItem('krosskhana_splash_seen', 'true');
+            
+            // Hide splash screen immediately
+            if (splashScreen) {
+                splashScreen.style.display = 'none';
+            }
+            
+            // Show main app immediately
+            if (mainApp) {
+                mainApp.classList.remove('hidden');
+                mainApp.style.opacity = '1';
+                mainApp.style.transform = 'translateY(0) scale(1)';
+                mainApp.style.zIndex = '10';
+                mainApp.style.pointerEvents = 'auto';
+                mainApp.classList.remove('overlay-active');
+            }
+            
+            // Show navbar immediately
+            const navbar = document.querySelector('nav');
+            if (navbar) {
+                navbar.style.opacity = '1';
+                navbar.style.visibility = 'visible';
+                navbar.style.zIndex = '9999';
+                navbar.classList.add('splash-cleared');
+            }
+            
+            // Set home as active navigation
+            updateActiveNavigation('home');
+        }
+        
+        // Start homepage overlay 5 seconds before video ends
+        function startHomepageOverlay() {
+            // Mark overlay as active to prevent multiple calls
+            mainApp.classList.add('overlay-active');
+            
+            // Show main app as overlay with very low opacity
+            mainApp.classList.remove('hidden');
+            mainApp.style.opacity = '0.05'; // Start almost invisible
+            mainApp.style.transform = 'translateY(0) scale(1)';
+            mainApp.style.zIndex = '40'; // Below splash screen but above background
+            
+            // Gradually increase opacity over 5 seconds
+            let opacity = 0.05;
+            const opacityStep = 0.95 / 50; // 50 steps over 5 seconds (100ms each)
+            
+            const overlayInterval = setInterval(() => {
+                opacity += opacityStep;
+                if (mainApp) {
+                    mainApp.style.opacity = Math.min(opacity, 1);
+                }
+                
+                if (opacity >= 1) {
+                    clearInterval(overlayInterval);
+                }
+            }, 100);
+            
+            // Set home as the active navigation item
+            updateActiveNavigation('home');
+            
+            // Start showing the navbar as the overlay begins
+            const navbar = document.querySelector('nav');
+            if (navbar) {
+                navbar.style.opacity = '0.1'; // Start very faint
+                navbar.style.visibility = 'visible';
+                
+                // Gradually increase navbar opacity
+                let navbarOpacity = 0.1;
+                const navbarOpacityStep = 0.9 / 50; // 50 steps over 5 seconds
+                
+                const navbarInterval = setInterval(() => {
+                    navbarOpacity += navbarOpacityStep;
+                    if (navbar) {
+                        navbar.style.opacity = Math.min(navbarOpacity, 1);
+                        if (navbarOpacity >= 1) {
+                            navbar.classList.add('splash-cleared');
+                        }
+                    }
+                    
+                    if (navbarOpacity >= 1) {
+                        clearInterval(navbarInterval);
+                    }
+                }, 100);
+            }
+        }
+        
+        // Complete the transition when video ends
+        function completeTransition() {
+            // Mark splash as seen in localStorage
+            localStorage.setItem('krosskhana_splash_seen', 'true');
+            
+            // Ensure main app is fully visible and interactive
+            if (mainApp) {
+                mainApp.style.opacity = '1';
+                mainApp.style.zIndex = '10'; // Normal z-index
+                mainApp.style.pointerEvents = 'auto'; // Re-enable interactions
+                mainApp.classList.remove('overlay-active'); // Remove overlay positioning
+            }
+            
+            // Ensure navbar is fully visible
+            const navbar = document.querySelector('nav');
+            if (navbar) {
+                navbar.style.opacity = '1';
+                navbar.style.visibility = 'visible';
+                navbar.style.zIndex = '9999';
+                navbar.classList.add('splash-cleared');
+            }
+            
+            // Fade out splash screen
+            splashScreen.classList.remove('animate-splash-fade-in');
+            splashScreen.classList.add('animate-splash-fade-out');
             splashScreen.style.opacity = '0';
             splashScreen.style.pointerEvents = 'none';
-            mainApp.classList.remove('hidden');
             
+            // Hide splash screen completely after fade out
             setTimeout(() => {
                 splashScreen.style.display = 'none';
-            }, 1000);
+            }, 1200);
+        }
+        
+        // Skip to complete transition immediately
+        function skipToComplete() {
+            // Mark splash as seen in localStorage
+            localStorage.setItem('krosskhana_splash_seen', 'true');
+            
+            // Clear any progress intervals
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+            
+            // Ensure main app is visible and properly positioned
+            if (mainApp) {
+                mainApp.classList.remove('hidden');
+                mainApp.style.opacity = '1';
+                mainApp.style.transform = 'translateY(0) scale(1)';
+                mainApp.style.zIndex = '10'; // Normal z-index
+                mainApp.style.pointerEvents = 'auto'; // Re-enable interactions
+                mainApp.classList.remove('overlay-active'); // Remove overlay positioning
+            }
+            
+            // Set home as the active navigation item
+            updateActiveNavigation('home');
+            
+            // Ensure navbar is fully visible immediately when skipping
+            const navbar = document.querySelector('nav');
+            if (navbar) {
+                navbar.style.opacity = '1';
+                navbar.style.visibility = 'visible';
+                navbar.style.zIndex = '9999';
+                navbar.classList.add('splash-cleared');
+            }
+            
+            // Fade out splash screen immediately
+            splashScreen.classList.remove('animate-splash-fade-in');
+            splashScreen.classList.add('animate-splash-fade-out');
+            splashScreen.style.opacity = '0';
+            splashScreen.style.pointerEvents = 'none';
+            
+            // Hide splash screen completely after fade out
+            setTimeout(() => {
+                splashScreen.style.display = 'none';
+            }, 800); // Faster transition for skip
+        }
+        
+        // Legacy function for skip button (now calls complete transition)
+        function hideSplashScreen() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+            completeTransition();
         }
     }
 }
@@ -837,7 +925,6 @@ function initDropdownMenu() {
 
 // Global tab switching functions
 window.switchToPastEvents = function() {
-    console.log('switchToPastEvents called');
     const pastEventsTab = document.getElementById('past-events-tab');
     const upcomingEventsTab = document.getElementById('upcoming-events-tab');
     const pastEventsContent = document.getElementById('past-events-content');
@@ -845,25 +932,16 @@ window.switchToPastEvents = function() {
     
     if (pastEventsTab && upcomingEventsTab && pastEventsContent && upcomingEventsContent) {
         // Update tab styles
-        pastEventsTab.className = 'px-8 py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg';
-        upcomingEventsTab.className = 'px-8 py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10';
+        pastEventsTab.className = 'px-3 md:px-8 py-1.5 md:py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg text-xs md:text-base whitespace-nowrap';
+        upcomingEventsTab.className = 'px-3 md:px-8 py-1.5 md:py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10 text-xs md:text-base whitespace-nowrap';
         
         // Show/hide content
         pastEventsContent.style.display = 'block';
         upcomingEventsContent.style.display = 'none';
-        
-        console.log('Past events tab activated');
-        console.log('Content display states:', {
-            pastEventsContent: pastEventsContent.style.display,
-            upcomingEventsContent: upcomingEventsContent.style.display
-        });
-    } else {
-        console.error('Some elements not found');
     }
 };
 
 window.switchToUpcomingEvents = function() {
-    console.log('switchToUpcomingEvents called');
     const pastEventsTab = document.getElementById('past-events-tab');
     const upcomingEventsTab = document.getElementById('upcoming-events-tab');
     const pastEventsContent = document.getElementById('past-events-content');
@@ -871,38 +949,16 @@ window.switchToUpcomingEvents = function() {
     
     if (pastEventsTab && upcomingEventsTab && pastEventsContent && upcomingEventsContent) {
         // Update tab styles
-        upcomingEventsTab.className = 'px-8 py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg';
-        pastEventsTab.className = 'px-8 py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10';
+        upcomingEventsTab.className = 'px-3 md:px-8 py-1.5 md:py-3 rounded-full text-black font-semibold transition-all duration-300 bg-gradient-to-r from-white to-gray-300 shadow-lg text-xs md:text-base whitespace-nowrap';
+        pastEventsTab.className = 'px-3 md:px-8 py-1.5 md:py-3 rounded-full text-gray-300 font-semibold transition-all duration-300 hover:text-white hover:bg-white/10 text-xs md:text-base whitespace-nowrap';
         
         // Show/hide content
         upcomingEventsContent.style.display = 'block';
         pastEventsContent.style.display = 'none';
-        
-        console.log('Upcoming events tab activated');
-        console.log('Content display states:', {
-            pastEventsContent: pastEventsContent.style.display,
-            upcomingEventsContent: upcomingEventsContent.style.display
-        });
-    } else {
-        console.error('Some elements not found');
     }
 };
 
-// Test if functions are defined
-console.log('Functions defined:', {
-    switchToPastEvents: typeof window.switchToPastEvents,
-    switchToUpcomingEvents: typeof window.switchToUpcomingEvents
-});
 
-// Test function call
-setTimeout(() => {
-    console.log('Testing function availability after 1 second...');
-    if (typeof window.switchToUpcomingEvents === 'function') {
-        console.log('switchToUpcomingEvents is available and ready to use');
-    } else {
-        console.error('switchToUpcomingEvents is not available');
-    }
-}, 1000);
 
 // Add video end event listener
 document.addEventListener('DOMContentLoaded', function() {
@@ -950,7 +1006,6 @@ function initCarousel() {
     const indicators = document.querySelectorAll('.carousel-indicator');
     
     if (!carouselTrack || !prevBtn || !nextBtn) {
-        console.log('Carousel elements not found, skipping carousel initialization');
         return;
     }
     

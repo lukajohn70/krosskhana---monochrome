@@ -1,5 +1,6 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Check if admin is logged in
 if (!isAdminLoggedIn()) {
@@ -54,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $page = max(1, intval($_GET['page'] ?? 1));
     $limit = intval($_GET['limit'] ?? 10);
+    $limit = max(1, min($limit, 100));
     
     $offset = ($page - 1) * $limit;
     
@@ -66,9 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $total = $countStmt->fetch()['total'];
         
         // Get campaigns data
-        $sql = "SELECT * FROM campaigns ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        $sql = "SELECT * FROM campaigns ORDER BY created_at DESC LIMIT $limit OFFSET $offset";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$limit, $offset]);
+        $stmt->execute();
         $data = $stmt->fetchAll();
         
         // Calculate pagination
@@ -130,14 +132,22 @@ function handleCreateCampaign($pdo, $data) {
     
     try {
         $stmt = $pdo->prepare("INSERT INTO campaigns (name, subject, content, status, target_audience, scheduled_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $result = $stmt->execute([$name, $subject, $content, $status, json_encode($targetAudience), $scheduledAt, 1]);
+        $result = $stmt->execute([$name, $subject, $content, $status, json_encode($targetAudience), $scheduledAt, getCurrentAdminId() ?: 1]);
         
         if ($result) {
             $campaignId = $pdo->lastInsertId();
             
             // If sending immediately, start the send process
             if ($status === 'draft' && $data['send_type'] === 'now') {
-                handleSendCampaign($pdo, ['id' => $campaignId]);
+                $sendResult = processCampaignSend($pdo, $campaignId);
+                sendJSONResponse([
+                    'status' => $sendResult['success'] ? 'success' : 'error',
+                    'message' => $sendResult['message'],
+                    'id' => $campaignId,
+                    'recipient_count' => $sendResult['recipient_count'],
+                    'sent_count' => $sendResult['sent_count'],
+                    'failed_count' => $sendResult['failed_count']
+                ], $sendResult['success'] ? 200 : 500);
             }
             
             sendJSONResponse(['status' => 'success', 'message' => 'Campaign created successfully', 'id' => $campaignId]);
@@ -156,47 +166,14 @@ function handleSendCampaign($pdo, $data) {
         sendJSONResponse(['status' => 'error', 'message' => 'Invalid campaign ID'], 400);
     }
     
-    try {
-        // Get campaign details
-        $stmt = $pdo->prepare("SELECT * FROM campaigns WHERE id = ?");
-        $stmt->execute([$campaignId]);
-        $campaign = $stmt->fetch();
-        
-        if (!$campaign) {
-            sendJSONResponse(['status' => 'error', 'message' => 'Campaign not found'], 404);
-        }
-        
-        // Allow resend for sent campaigns, but not for currently sending campaigns
-        if ($campaign['status'] === 'sending') {
-            sendJSONResponse(['status' => 'error', 'message' => 'Campaign is currently being sent'], 400);
-        }
-        
-        // Get target recipients
-        $recipients = getTargetRecipients($pdo, json_decode($campaign['target_audience'], true));
-        
-        if (empty($recipients)) {
-            sendJSONResponse(['status' => 'error', 'message' => 'No recipients found for this campaign'], 400);
-        }
-        
-        // Update campaign status
-        $stmt = $pdo->prepare("UPDATE campaigns SET status = 'sending', total_recipients = ? WHERE id = ?");
-        $stmt->execute([count($recipients), $campaignId]);
-        
-        // Create recipient records
-        foreach ($recipients as $recipient) {
-            $trackingToken = generateTrackingToken();
-            $stmt = $pdo->prepare("INSERT INTO campaign_recipients (campaign_id, subscriber_id, email, tracking_token) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$campaignId, $recipient['id'], $recipient['email'], $trackingToken]);
-        }
-        
-        // Start sending emails (in background)
-        sendCampaignEmails($pdo, $campaign, $recipients);
-        
-        sendJSONResponse(['status' => 'success', 'message' => 'Campaign sending started', 'recipient_count' => count($recipients)]);
-        
-    } catch (PDOException $e) {
-        sendJSONResponse(['status' => 'error', 'message' => 'Database error'], 500);
-    }
+    $result = processCampaignSend($pdo, $campaignId);
+    sendJSONResponse([
+        'status' => $result['success'] ? 'success' : 'error',
+        'message' => $result['message'],
+        'recipient_count' => $result['recipient_count'],
+        'sent_count' => $result['sent_count'],
+        'failed_count' => $result['failed_count']
+    ], $result['success'] ? 200 : 500);
 }
 
 function handleDeleteCampaign($pdo, $data) {
@@ -221,7 +198,14 @@ function handleDeleteCampaign($pdo, $data) {
 }
 
 function handlePreviewRecipients($pdo, $data) {
-    $targetAudience = buildTargetAudience($data['target_audience']);
+    $targetAudienceInput = $data['target_audience'] ?? [];
+
+    // JS FormData serialisation can send tags as tags[] key
+    if (isset($targetAudienceInput['tags[]']) && !isset($targetAudienceInput['tags'])) {
+        $targetAudienceInput['tags'] = $targetAudienceInput['tags[]'];
+    }
+
+    $targetAudience = buildTargetAudience($targetAudienceInput);
     $recipients = getTargetRecipients($pdo, $targetAudience);
     
     sendJSONResponse([
@@ -231,9 +215,15 @@ function handlePreviewRecipients($pdo, $data) {
 }
 
 function buildTargetAudience($data) {
+    $rawTags = $data['tags'] ?? [];
+    if (!is_array($rawTags)) {
+        $rawTags = [$rawTags];
+    }
+    $normalizedTags = array_values(array_filter(array_map('intval', $rawTags), fn($id) => $id > 0));
+
     $targetAudience = [
         'type' => $data['target_type'] ?? 'all',
-        'tags' => $data['tags'] ?? [],
+        'tags' => $normalizedTags,
         'subscribed_after' => $data['subscribed_after'] ?? null,
         'subscribed_before' => $data['subscribed_before'] ?? null
     ];
@@ -242,6 +232,8 @@ function buildTargetAudience($data) {
 }
 
 function getTargetRecipients($pdo, $targetAudience) {
+    syncNewsletterOnlyTagRelationships($pdo);
+
     $sql = "SELECT id, name, email FROM newsletter_subscriptions WHERE status = 'active'";
     $params = [];
     
@@ -268,9 +260,35 @@ function getTargetRecipients($pdo, $targetAudience) {
     return $stmt->fetchAll();
 }
 
+function syncNewsletterOnlyTagRelationships($pdo) {
+    try {
+        $tagStmt = $pdo->prepare("SELECT id FROM subscriber_tags WHERE name = ? LIMIT 1");
+        $tagStmt->execute(['Newsletter Only']);
+        $tag = $tagStmt->fetch();
+
+        if (!$tag) {
+            return;
+        }
+
+        $syncSql = "
+            INSERT IGNORE INTO subscriber_tag_relationships (subscriber_id, tag_id)
+            SELECT ns.id, ?
+            FROM newsletter_subscriptions ns
+            WHERE ns.status = 'active'
+        ";
+        $syncStmt = $pdo->prepare($syncSql);
+        $syncStmt->execute([$tag['id']]);
+    } catch (PDOException $e) {
+        error_log('Tag sync warning: ' . $e->getMessage());
+    }
+}
+
 function sendCampaignEmails($pdo, $campaign, $recipients) {
-    require_once '../../includes/email-helper.php';
-    
+    require_once __DIR__ . '/../../includes/email-helper.php';
+
+    $sentCount = 0;
+    $failedCount = 0;
+
     foreach ($recipients as $recipient) {
         // Get tracking token
         $stmt = $pdo->prepare("SELECT tracking_token FROM campaign_recipients WHERE campaign_id = ? AND subscriber_id = ?");
@@ -284,11 +302,81 @@ function sendCampaignEmails($pdo, $campaign, $recipients) {
         $status = $sent ? 'sent' : 'failed';
         $stmt = $pdo->prepare("UPDATE campaign_recipients SET status = ?, sent_at = NOW() WHERE campaign_id = ? AND subscriber_id = ?");
         $stmt->execute([$status, $campaign['id'], $recipient['id']]);
+
+        if ($sent) {
+            $sentCount++;
+        } else {
+            $failedCount++;
+        }
     }
-    
-    // Update campaign status
-    $stmt = $pdo->prepare("UPDATE campaigns SET status = 'sent', sent_at = NOW() WHERE id = ?");
-    $stmt->execute([$campaign['id']]);
+
+    return [
+        'sent_count' => $sentCount,
+        'failed_count' => $failedCount
+    ];
+}
+
+function processCampaignSend($pdo, $campaignId) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM campaigns WHERE id = ?");
+        $stmt->execute([$campaignId]);
+        $campaign = $stmt->fetch();
+
+        if (!$campaign) {
+            return ['success' => false, 'message' => 'Campaign not found', 'recipient_count' => 0, 'sent_count' => 0, 'failed_count' => 0];
+        }
+
+        if ($campaign['status'] === 'sending') {
+            return ['success' => false, 'message' => 'Campaign is currently being sent', 'recipient_count' => 0, 'sent_count' => 0, 'failed_count' => 0];
+        }
+
+        $targetAudience = json_decode($campaign['target_audience'], true) ?: ['type' => 'all', 'tags' => []];
+
+        if (($targetAudience['type'] ?? 'all') === 'tags' && empty($targetAudience['tags'])) {
+            return [
+                'success' => false,
+                'message' => 'No audience tags selected. Choose at least one tag or switch to All Active Subscribers.',
+                'recipient_count' => 0,
+                'sent_count' => 0,
+                'failed_count' => 0
+            ];
+        }
+
+        $recipients = getTargetRecipients($pdo, $targetAudience);
+        if (empty($recipients)) {
+            return ['success' => false, 'message' => 'No recipients found for this campaign', 'recipient_count' => 0, 'sent_count' => 0, 'failed_count' => 0];
+        }
+
+        $pdo->prepare("DELETE FROM campaign_recipients WHERE campaign_id = ?")->execute([$campaignId]);
+        $pdo->prepare("UPDATE campaigns SET status = 'sending', total_recipients = ?, sent_at = NULL WHERE id = ?")->execute([count($recipients), $campaignId]);
+
+        foreach ($recipients as $recipient) {
+            $trackingToken = generateTrackingToken();
+            $stmt = $pdo->prepare("INSERT INTO campaign_recipients (campaign_id, subscriber_id, email, tracking_token) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$campaignId, $recipient['id'], $recipient['email'], $trackingToken]);
+        }
+
+        $sendStats = sendCampaignEmails($pdo, $campaign, $recipients);
+        $allFailed = $sendStats['sent_count'] === 0;
+        $nextStatus = $allFailed ? 'draft' : 'sent';
+        $sentAt = $allFailed ? null : date('Y-m-d H:i:s');
+        $pdo->prepare("UPDATE campaigns SET status = ?, sent_at = ? WHERE id = ?")->execute([$nextStatus, $sentAt, $campaignId]);
+
+        return [
+            'success' => !$allFailed,
+            'message' => $allFailed
+                ? 'No emails were delivered. Confirm SMTP settings before retrying.'
+                : ($sendStats['failed_count'] > 0
+                    ? 'Campaign sent with some delivery failures. Review recipient statuses for details.'
+                    : 'Campaign sent successfully.'),
+            'recipient_count' => count($recipients),
+            'sent_count' => $sendStats['sent_count'],
+            'failed_count' => $sendStats['failed_count']
+        ];
+    } catch (PDOException $e) {
+        error_log('Campaign send error: ' . $e->getMessage());
+        return ['success' => false, 'message' => 'Database error while sending campaign', 'recipient_count' => 0, 'sent_count' => 0, 'failed_count' => 0];
+    }
 }
 
 

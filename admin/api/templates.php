@@ -1,5 +1,6 @@
 <?php
-require_once '../../includes/config.php';
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 // Check if admin is logged in
 requireAdminAuth();
