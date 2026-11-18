@@ -54,7 +54,7 @@ function ensureCoreTables(PDO $pdo) {
             $existingUser = $userCheck->fetch();
             if (!$existingUser) {
                 $hash = password_hash('12', PASSWORD_DEFAULT);
-                $ins = $pdo->prepare("INSERT INTO admin_users (username, email, password_hash, role, is_active, must_setup_2fa) VALUES (?, ?, ?, 'super_admin', 1, 0)");
+                $ins = $pdo->prepare("INSERT INTO admin_users (username, email, password_hash, role, is_active, must_setup_2fa) VALUES (?, ?, ?, 'admin', 1, 0)");
                 $ins->execute(['lukajohn70', 'lukajohn70@gmail.com', $hash]);
             }
         } catch (Exception $e) {

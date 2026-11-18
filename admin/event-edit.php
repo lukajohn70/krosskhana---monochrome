@@ -426,13 +426,23 @@ if ($isEdit && $pdo) {
                 method: 'POST',
                 body: formData
             })
-            .then(res => res.json())
+            .then(async (res) => {
+                const text = await res.text();
+                let data = null;
+                try {
+                    data = JSON.parse(text);
+                } catch (pe) {
+                    const cleanMsg = text.replace(/<[^>]+>/g, '').trim();
+                    throw new Error(cleanMsg || `Server responded with status ${res.status}`);
+                }
+                return data;
+            })
             .then(data => {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
 
                 if (data.status === 'success') {
-                    showToast(data.message, 'success');
+                    showToast(data.message || 'Event saved successfully!', 'success');
                     setTimeout(() => {
                         window.location.href = 'events.php';
                     }, 1000);
@@ -444,7 +454,7 @@ if ($isEdit && $pdo) {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
                 console.error('Submit error:', err);
-                showToast('Failed to save event. Check console or server logs.', 'error');
+                showToast(err.message || 'Failed to save event.', 'error');
             });
         }
 

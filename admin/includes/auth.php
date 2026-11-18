@@ -81,6 +81,18 @@ function requireAdminAuth() {
 }
 
 /**
+ * Require admin authentication for JSON APIs - returns 401 JSON instead of redirecting
+ */
+function requireAdminApiAuth() {
+    if (isAdmin2FAPending()) {
+        sendJSONResponse(['status' => 'error', 'message' => 'Two-factor authentication required.'], 401);
+    }
+    if (!isAdminLoggedIn()) {
+        sendJSONResponse(['status' => 'error', 'message' => 'Session expired or not authenticated. Please log in again.'], 401);
+    }
+}
+
+/**
  * Logout current admin user
  */
 function adminLogout() {

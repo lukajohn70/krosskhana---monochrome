@@ -2,8 +2,8 @@
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 
-// Check if admin is logged in
-requireAdminAuth();
+// Check if admin is logged in (API version - returns 401 JSON instead of redirecting)
+requireAdminApiAuth();
 
 $pdo = getDBConnection();
 
@@ -11,40 +11,62 @@ if (!$pdo) {
     sendJSONResponse(['status' => 'error', 'message' => 'Database connection failed'], 500);
 }
 
-// Function to handle image upload
+// Ensure events table exists
+if (function_exists('ensureCoreTables')) {
+    ensureCoreTables($pdo);
+}
+
+// Function to handle image upload safely
 function handleEventImageUpload($file) {
     if (!isset($file['error']) || is_array($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
-        return ['success' => false, 'message' => 'Upload error'];
+        return ['success' => false, 'message' => 'Upload error (code: ' . ($file['error'] ?? 'unknown') . ')'];
     }
 
     if ($file['size'] > MAX_FILE_SIZE) {
         return ['success' => false, 'message' => 'File exceeds 5MB limit'];
     }
 
-    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime = $finfo->file($file['tmp_name']);
-
-    if (!in_array($mime, $allowedMimes)) {
+    $ext = pathinfo($file['name'] ?? '', PATHINFO_EXTENSION);
+    $ext = strtolower($ext);
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
         return ['success' => false, 'message' => 'Only JPG, PNG, WEBP, and GIF images are allowed'];
     }
 
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    $ext = strtolower($ext);
-    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
-        return ['success' => false, 'message' => 'Invalid file extension'];
+    // Safe MIME detection with fallbacks
+    $mime = '';
+    if (class_exists('finfo')) {
+        try {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']);
+        } catch (Throwable $fe) {}
+    }
+    if (!$mime && function_exists('mime_content_type')) {
+        $mime = @mime_content_type($file['tmp_name']);
+    }
+    if (!$mime && function_exists('getimagesize')) {
+        $size = @getimagesize($file['tmp_name']);
+        $mime = $size['mime'] ?? '';
+    }
+
+    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if ($mime && !in_array($mime, $allowedMimes)) {
+        return ['success' => false, 'message' => 'Invalid image format (' . htmlspecialchars($mime) . ')'];
     }
 
     $uploadDir = __DIR__ . '/../../assets/images/events/';
     if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
+        @mkdir($uploadDir, 0755, true);
     }
+    @chmod($uploadDir, 0755);
 
     $fileName = 'event_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
     $targetPath = $uploadDir . $fileName;
 
-    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
-        return ['success' => false, 'message' => 'Failed to move uploaded file'];
+    if (!@move_uploaded_file($file['tmp_name'], $targetPath)) {
+        if (!@copy($file['tmp_name'], $targetPath)) {
+            return ['success' => false, 'message' => 'Failed to save uploaded file to assets/images/events/'];
+        }
+        @unlink($file['tmp_name']);
     }
 
     // Relative web path from website root
@@ -54,65 +76,81 @@ function handleEventImageUpload($file) {
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-    $input = [];
+    try {
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        $input = [];
 
-    if (strpos($contentType, 'application/json') !== false) {
-        $input = json_decode(file_get_contents('php://input'), true) ?? [];
-    } else {
-        $input = $_POST;
-    }
+        if (strpos($contentType, 'application/json') !== false) {
+            $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        } else {
+            $input = $_POST;
+        }
 
-    $action = $input['action'] ?? '';
+        $action = $input['action'] ?? '';
 
-    switch ($action) {
-        case 'create':
-            $title = trim($input['title'] ?? '');
-            $eventType = in_array($input['event_type'] ?? '', ['past', 'upcoming']) ? $input['event_type'] : 'upcoming';
-            $eventDateText = trim($input['event_date_text'] ?? '');
-            $eventDate = !empty($input['event_date']) ? $input['event_date'] : null;
-            $description = trim($input['description'] ?? '');
-            $badgeText = trim($input['badge_text'] ?? '');
-            if ($badgeText === '') {
-                $badgeText = ($eventType === 'past') ? 'Past Event' : 'Coming Soon';
-            }
-            $gradientTheme = trim($input['gradient_theme'] ?? 'from-white to-gray-300');
-            $buttonText = trim($input['button_text'] ?? '');
-            if ($buttonText === '') {
-                $buttonText = ($eventType === 'past') ? 'View Gallery' : 'Learn More';
-            }
-            $buttonLink = trim($input['button_link'] ?? '');
-            $sortOrder = intval($input['sort_order'] ?? 0);
-            $isActive = isset($input['is_active']) ? (intval($input['is_active']) ? 1 : 0) : 1;
+        switch ($action) {
+            case 'create':
+                $title = trim($input['title'] ?? '');
+                $eventType = in_array($input['event_type'] ?? '', ['past', 'upcoming']) ? $input['event_type'] : 'upcoming';
+                $eventDateText = trim($input['event_date_text'] ?? '');
+                
+                $rawDate = trim($input['event_date'] ?? '');
+                $eventDate = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDate)) ? $rawDate : null;
 
-            if ($title === '') {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event title is required'], 400);
-            }
-            if ($eventDateText === '') {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event date display text is required'], 400);
-            }
-            if ($description === '') {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event description is required'], 400);
-            }
-
-            $slug = trim($input['slug'] ?? '');
-            if ($slug === '') {
-                $slug = generateSlug($title);
-            } else {
-                $slug = generateSlug($slug);
-            }
-
-            // Image handling
-            $imageUrl = trim($input['image_url'] ?? '');
-            if (isset($_FILES['image_file']) && $_FILES['image_file']['error'] !== UPLOAD_ERR_NO_FILE) {
-                $uploadRes = handleEventImageUpload($_FILES['image_file']);
-                if (!$uploadRes['success']) {
-                    sendJSONResponse(['status' => 'error', 'message' => $uploadRes['message']], 400);
+                $description = trim($input['description'] ?? '');
+                $badgeText = trim($input['badge_text'] ?? '');
+                if ($badgeText === '') {
+                    $badgeText = ($eventType === 'past') ? 'Past Event' : 'Coming Soon';
                 }
-                $imageUrl = $uploadRes['path'];
-            }
+                $gradientTheme = trim($input['gradient_theme'] ?? 'from-white to-gray-300');
+                $buttonText = trim($input['button_text'] ?? '');
+                if ($buttonText === '') {
+                    $buttonText = ($eventType === 'past') ? 'View Gallery' : 'Learn More';
+                }
+                $buttonLink = trim($input['button_link'] ?? '');
+                $sortOrder = intval($input['sort_order'] ?? 0);
+                $isActive = isset($input['is_active']) ? (intval($input['is_active']) ? 1 : 0) : 1;
 
-            try {
+                if ($title === '') {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event title is required'], 400);
+                }
+                if ($eventDateText === '') {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event date display text is required'], 400);
+                }
+                if ($description === '') {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event description is required'], 400);
+                }
+
+                $slug = trim($input['slug'] ?? '');
+                if ($slug === '') {
+                    $slug = generateSlug($title);
+                } else {
+                    $slug = generateSlug($slug);
+                }
+
+                // Prevent slug collision
+                $baseSlug = $slug;
+                $slugCounter = 1;
+                while (true) {
+                    $chkStmt = $pdo->prepare("SELECT id FROM events WHERE slug = ?");
+                    $chkStmt->execute([$slug]);
+                    if (!$chkStmt->fetch()) {
+                        break;
+                    }
+                    $slug = $baseSlug . '-' . $slugCounter;
+                    $slugCounter++;
+                }
+
+                // Image handling
+                $imageUrl = trim($input['image_url'] ?? '');
+                if (isset($_FILES['image_file']) && $_FILES['image_file']['error'] !== UPLOAD_ERR_NO_FILE) {
+                    $uploadRes = handleEventImageUpload($_FILES['image_file']);
+                    if (!$uploadRes['success']) {
+                        sendJSONResponse(['status' => 'error', 'message' => $uploadRes['message']], 400);
+                    }
+                    $imageUrl = $uploadRes['path'];
+                }
+
                 $stmt = $pdo->prepare("INSERT INTO events 
                     (title, slug, event_type, badge_text, event_date_text, event_date, description, image_url, gradient_theme, button_text, button_link, sort_order, is_active)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -133,75 +171,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 $newId = $pdo->lastInsertId();
                 sendJSONResponse(['status' => 'success', 'message' => 'Event created successfully', 'id' => $newId]);
-            } catch (PDOException $e) {
-                error_log('Event create error: ' . $e->getMessage());
-                sendJSONResponse(['status' => 'error', 'message' => 'Failed to create event: ' . $e->getMessage()], 500);
-            }
-            break;
+                break;
 
-        case 'update':
-            $id = intval($input['id'] ?? 0);
-            if (!$id) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
-            }
-
-            $title = trim($input['title'] ?? '');
-            $eventType = in_array($input['event_type'] ?? '', ['past', 'upcoming']) ? $input['event_type'] : 'upcoming';
-            $eventDateText = trim($input['event_date_text'] ?? '');
-            $eventDate = !empty($input['event_date']) ? $input['event_date'] : null;
-            $description = trim($input['description'] ?? '');
-            $badgeText = trim($input['badge_text'] ?? '');
-            if ($badgeText === '') {
-                $badgeText = ($eventType === 'past') ? 'Past Event' : 'Coming Soon';
-            }
-            $gradientTheme = trim($input['gradient_theme'] ?? 'from-white to-gray-300');
-            $buttonText = trim($input['button_text'] ?? '');
-            if ($buttonText === '') {
-                $buttonText = ($eventType === 'past') ? 'View Gallery' : 'Learn More';
-            }
-            $buttonLink = trim($input['button_link'] ?? '');
-            $sortOrder = intval($input['sort_order'] ?? 0);
-            $isActive = isset($input['is_active']) ? (intval($input['is_active']) ? 1 : 0) : 1;
-
-            if ($title === '') {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event title is required'], 400);
-            }
-            if ($eventDateText === '') {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event date display text is required'], 400);
-            }
-            if ($description === '') {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event description is required'], 400);
-            }
-
-            $slug = trim($input['slug'] ?? '');
-            if ($slug === '') {
-                $slug = generateSlug($title);
-            } else {
-                $slug = generateSlug($slug);
-            }
-
-            // Existing event
-            $stmt = $pdo->prepare("SELECT * FROM events WHERE id = ?");
-            $stmt->execute([$id]);
-            $existing = $stmt->fetch();
-            if (!$existing) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Event not found'], 404);
-            }
-
-            $imageUrl = $existing['image_url'];
-            if (!empty($input['remove_image']) && ($input['remove_image'] === '1' || $input['remove_image'] === true || $input['remove_image'] === 'true')) {
-                $imageUrl = '';
-            } elseif (isset($_FILES['image_file']) && $_FILES['image_file']['error'] !== UPLOAD_ERR_NO_FILE) {
-                $uploadRes = handleEventImageUpload($_FILES['image_file']);
-                if (!$uploadRes['success']) {
-                    sendJSONResponse(['status' => 'error', 'message' => $uploadRes['message']], 400);
+            case 'update':
+                $id = intval($input['id'] ?? 0);
+                if (!$id) {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
                 }
-                $imageUrl = $uploadRes['path'];
-            } elseif (isset($input['image_url'])) {
-                $imageUrl = trim($input['image_url']);
-            }
 
-            try {
+                $title = trim($input['title'] ?? '');
+                $eventType = in_array($input['event_type'] ?? '', ['past', 'upcoming']) ? $input['event_type'] : 'upcoming';
+                $eventDateText = trim($input['event_date_text'] ?? '');
+                
+                $rawDate = trim($input['event_date'] ?? '');
+                $eventDate = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawDate)) ? $rawDate : null;
+
+                $description = trim($input['description'] ?? '');
+                $badgeText = trim($input['badge_text'] ?? '');
+                if ($badgeText === '') {
+                    $badgeText = ($eventType === 'past') ? 'Past Event' : 'Coming Soon';
+                }
+                $gradientTheme = trim($input['gradient_theme'] ?? 'from-white to-gray-300');
+                $buttonText = trim($input['button_text'] ?? '');
+                if ($buttonText === '') {
+                    $buttonText = ($eventType === 'past') ? 'View Gallery' : 'Learn More';
+                }
+                $buttonLink = trim($input['button_link'] ?? '');
+                $sortOrder = intval($input['sort_order'] ?? 0);
+                $isActive = isset($input['is_active']) ? (intval($input['is_active']) ? 1 : 0) : 0;
+
+                if ($title === '') {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event title is required'], 400);
+                }
+                if ($eventDateText === '') {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event date display text is required'], 400);
+                }
+                if ($description === '') {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event description is required'], 400);
+                }
+
+                $slug = trim($input['slug'] ?? '');
+                if ($slug === '') {
+                    $slug = generateSlug($title);
+                } else {
+                    $slug = generateSlug($slug);
+                }
+
+                // Prevent slug collision
+                $baseSlug = $slug;
+                $slugCounter = 1;
+                while (true) {
+                    $chkStmt = $pdo->prepare("SELECT id FROM events WHERE slug = ? AND id != ?");
+                    $chkStmt->execute([$slug, $id]);
+                    if (!$chkStmt->fetch()) {
+                        break;
+                    }
+                    $slug = $baseSlug . '-' . $slugCounter;
+                    $slugCounter++;
+                }
+
+                // Existing event
+                $stmt = $pdo->prepare("SELECT * FROM events WHERE id = ?");
+                $stmt->execute([$id]);
+                $existing = $stmt->fetch();
+                if (!$existing) {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Event not found'], 404);
+                }
+
+                $imageUrl = $existing['image_url'];
+                if (!empty($input['remove_image']) && ($input['remove_image'] === '1' || $input['remove_image'] === true || $input['remove_image'] === 'true')) {
+                    $imageUrl = '';
+                } elseif (isset($_FILES['image_file']) && $_FILES['image_file']['error'] !== UPLOAD_ERR_NO_FILE) {
+                    $uploadRes = handleEventImageUpload($_FILES['image_file']);
+                    if (!$uploadRes['success']) {
+                        sendJSONResponse(['status' => 'error', 'message' => $uploadRes['message']], 400);
+                    }
+                    $imageUrl = $uploadRes['path'];
+                } elseif (isset($input['image_url'])) {
+                    $imageUrl = trim($input['image_url']);
+                }
+
                 $stmt = $pdo->prepare("UPDATE events SET 
                     title = ?, 
                     slug = ?, 
@@ -235,35 +284,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $id
                 ]);
                 sendJSONResponse(['status' => 'success', 'message' => 'Event updated successfully']);
-            } catch (PDOException $e) {
-                error_log('Event update error: ' . $e->getMessage());
-                sendJSONResponse(['status' => 'error', 'message' => 'Failed to update event: ' . $e->getMessage()], 500);
-            }
-            break;
+                break;
 
-        case 'delete':
-            $id = intval($input['id'] ?? 0);
-            if (!$id) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
-            }
+            case 'delete':
+                $id = intval($input['id'] ?? 0);
+                if (!$id) {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
+                }
 
-            try {
                 $stmt = $pdo->prepare("DELETE FROM events WHERE id = ?");
                 $stmt->execute([$id]);
                 sendJSONResponse(['status' => 'success', 'message' => 'Event deleted successfully']);
-            } catch (PDOException $e) {
-                error_log('Event delete error: ' . $e->getMessage());
-                sendJSONResponse(['status' => 'error', 'message' => 'Failed to delete event: ' . $e->getMessage()], 500);
-            }
-            break;
+                break;
 
-        case 'toggle_status':
-            $id = intval($input['id'] ?? 0);
-            if (!$id) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
-            }
+            case 'toggle_status':
+                $id = intval($input['id'] ?? 0);
+                if (!$id) {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
+                }
 
-            try {
                 $stmt = $pdo->prepare("UPDATE events SET is_active = IF(is_active = 1, 0, 1), updated_at = NOW() WHERE id = ?");
                 $stmt->execute([$id]);
                 $stmt = $pdo->prepare("SELECT is_active FROM events WHERE id = ?");
@@ -274,18 +313,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'message' => $isActive ? 'Event is now active' : 'Event is now hidden',
                     'is_active' => (int)$isActive
                 ]);
-            } catch (PDOException $e) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Failed to toggle status'], 500);
-            }
-            break;
+                break;
 
-        case 'toggle_type':
-            $id = intval($input['id'] ?? 0);
-            if (!$id) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
-            }
+            case 'toggle_type':
+                $id = intval($input['id'] ?? 0);
+                if (!$id) {
+                    sendJSONResponse(['status' => 'error', 'message' => 'Invalid event ID'], 400);
+                }
 
-            try {
                 $stmt = $pdo->prepare("SELECT * FROM events WHERE id = ?");
                 $stmt->execute([$id]);
                 $event = $stmt->fetch();
@@ -297,7 +332,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newBadge = $event['badge_text'];
                 $newButton = $event['button_text'];
 
-                // Automatically update default badges and button labels when moving between past and upcoming
                 if ($newType === 'past') {
                     if ($event['badge_text'] === 'Coming Soon') $newBadge = 'Past Event';
                     if ($event['button_text'] === 'Learn More') $newButton = 'View Gallery';
@@ -316,13 +350,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'badge_text' => $newBadge,
                     'button_text' => $newButton
                 ]);
-            } catch (PDOException $e) {
-                sendJSONResponse(['status' => 'error', 'message' => 'Failed to move event: ' . $e->getMessage()], 500);
-            }
-            break;
+                break;
 
-        default:
-            sendJSONResponse(['status' => 'error', 'message' => 'Invalid action'], 400);
+            default:
+                sendJSONResponse(['status' => 'error', 'message' => 'Invalid action'], 400);
+        }
+    } catch (Throwable $e) {
+        error_log('Events API error: ' . $e->getMessage());
+        sendJSONResponse(['status' => 'error', 'message' => 'Operation failed: ' . $e->getMessage()], 400);
     }
 }
 

@@ -2,47 +2,69 @@
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 
-// Require admin authentication
-requireAdminAuth();
+// Require admin authentication (API version)
+requireAdminApiAuth();
 
 $pdo = getDBConnection();
 if (!$pdo) {
     sendJSONResponse(['status' => 'error', 'message' => 'Database connection failed'], 500);
 }
 
+// Ensure tables exist
+if (function_exists('ensureCoreTables')) {
+    ensureCoreTables($pdo);
+}
+
 // Function to handle explore image upload
 function handleExploreImageUpload($file) {
     if (!isset($file['error']) || is_array($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
-        return ['success' => false, 'message' => 'Upload error'];
+        return ['success' => false, 'message' => 'Upload error (code: ' . ($file['error'] ?? 'unknown') . ')'];
     }
 
     if ($file['size'] > MAX_FILE_SIZE) {
         return ['success' => false, 'message' => 'File exceeds 5MB limit'];
     }
 
-    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime = $finfo->file($file['tmp_name']);
-
-    if (!in_array($mime, $allowedMimes)) {
-        return ['success' => false, 'message' => 'Only JPG, PNG, WEBP, and GIF images are allowed'];
-    }
-
-    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
     if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
         return ['success' => false, 'message' => 'Invalid file extension'];
+    }
+
+    // Safe MIME detection
+    $mime = '';
+    if (class_exists('finfo')) {
+        try {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']);
+        } catch (Throwable $fe) {}
+    }
+    if (!$mime && function_exists('mime_content_type')) {
+        $mime = @mime_content_type($file['tmp_name']);
+    }
+    if (!$mime && function_exists('getimagesize')) {
+        $size = @getimagesize($file['tmp_name']);
+        $mime = $size['mime'] ?? '';
+    }
+
+    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if ($mime && !in_array($mime, $allowedMimes)) {
+        return ['success' => false, 'message' => 'Only JPG, PNG, WEBP, and GIF images are allowed'];
     }
 
     $uploadDir = __DIR__ . '/../../assets/images/explore/';
     if (!is_dir($uploadDir)) {
         @mkdir($uploadDir, 0755, true);
     }
+    @chmod($uploadDir, 0755);
 
     $fileName = 'explore_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
     $targetPath = $uploadDir . $fileName;
 
     if (!@move_uploaded_file($file['tmp_name'], $targetPath)) {
-        return ['success' => false, 'message' => 'Failed to save uploaded image. Check directory permissions.'];
+        if (!@copy($file['tmp_name'], $targetPath)) {
+            return ['success' => false, 'message' => 'Failed to save uploaded file to assets/images/explore/'];
+        }
+        @unlink($file['tmp_name']);
     }
 
     return ['success' => true, 'path' => 'assets/images/explore/' . $fileName];

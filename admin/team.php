@@ -465,7 +465,15 @@ if ($pdo) {
                 method: 'POST',
                 body: formData
             })
-            .then(res => res.json())
+            .then(async (res) => {
+                const text = await res.text();
+                try {
+                    return JSON.parse(text);
+                } catch(e) {
+                    const clean = text.replace(/<[^>]+>/g, '').trim();
+                    throw new Error(clean || `Server returned status ${res.status}`);
+                }
+            })
             .then(data => {
                 btn.disabled = false;
                 document.getElementById('btn-submit-text').innerText = originalText;
