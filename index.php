@@ -8,6 +8,32 @@ $upcomingEvents = [];
 try {
     $eventsPdo = getDBConnection();
     if ($eventsPdo) {
+        // Ensure events table exists (self-healing)
+        $eventsPdo->exec("
+        CREATE TABLE IF NOT EXISTS events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL,
+            event_type ENUM('past', 'upcoming') NOT NULL DEFAULT 'upcoming',
+            badge_text VARCHAR(100) DEFAULT NULL,
+            event_date_text VARCHAR(100) NOT NULL,
+            event_date DATE DEFAULT NULL,
+            description TEXT NOT NULL,
+            image_url VARCHAR(500) DEFAULT NULL,
+            gradient_theme VARCHAR(50) DEFAULT 'from-white to-gray-300',
+            button_text VARCHAR(100) DEFAULT 'View Details',
+            button_link VARCHAR(500) DEFAULT NULL,
+            sort_order INT DEFAULT 0,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_event_type (event_type),
+            INDEX idx_is_active (is_active),
+            INDEX idx_sort_order (sort_order),
+            INDEX idx_event_date (event_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
         $eventsStmt = $eventsPdo->query("SELECT * FROM events WHERE is_active = 1 ORDER BY sort_order ASC, event_date DESC, id DESC");
         if ($eventsStmt) {
             $allDbEvents = $eventsStmt->fetchAll();
@@ -22,95 +48,6 @@ try {
     }
 } catch (Exception $e) {
     error_log('Error loading events in index.php: ' . $e->getMessage());
-}
-
-// Fallbacks if database has no records
-if (empty($pastEvents)) {
-    $pastEvents = [
-        [
-            'id' => 1,
-            'title' => 'Krosskhana 2023',
-            'slug' => 'krosskhana-2023',
-            'event_type' => 'past',
-            'badge_text' => 'Past Event',
-            'event_date_text' => 'December 2023',
-            'description' => 'Experience the thrill of our 2023 edition with over 2,000 attendees and exclusive Fast X premiere.',
-            'image_url' => '',
-            'gradient_theme' => 'from-white to-gray-300',
-            'button_text' => 'View Gallery',
-            'button_link' => ''
-        ],
-        [
-            'id' => 2,
-            'title' => 'Motor Sport Festival',
-            'slug' => 'motor-sport-festival-2023',
-            'event_type' => 'past',
-            'badge_text' => 'Past Event',
-            'event_date_text' => 'October 2023',
-            'description' => 'A celebration of automotive culture featuring drifting competitions and live performances.',
-            'image_url' => '',
-            'gradient_theme' => 'from-gray-300 to-white',
-            'button_text' => 'View Gallery',
-            'button_link' => ''
-        ],
-        [
-            'id' => 3,
-            'title' => 'Summer Drift',
-            'slug' => 'summer-drift-2023',
-            'event_type' => 'past',
-            'badge_text' => 'Past Event',
-            'event_date_text' => 'August 2023',
-            'description' => 'High-octane drifting competition with music and fashion showcases.',
-            'image_url' => '',
-            'gradient_theme' => 'from-white to-gray-300',
-            'button_text' => 'View Gallery',
-            'button_link' => ''
-        ]
-    ];
-}
-
-if (empty($upcomingEvents)) {
-    $upcomingEvents = [
-        [
-            'id' => 4,
-            'title' => 'Avant Gardex',
-            'slug' => 'avant-gardex-2024',
-            'event_type' => 'upcoming',
-            'badge_text' => 'Coming Soon',
-            'event_date_text' => 'March 2024',
-            'description' => 'The most anticipated event of the year - where innovation meets automotive excellence.',
-            'image_url' => '',
-            'gradient_theme' => 'from-white to-gray-300',
-            'button_text' => 'Learn More',
-            'button_link' => ''
-        ],
-        [
-            'id' => 5,
-            'title' => 'Spring Racing',
-            'slug' => 'spring-racing-2024',
-            'event_type' => 'upcoming',
-            'badge_text' => 'Coming Soon',
-            'event_date_text' => 'May 2024',
-            'description' => 'Revolutionary racing experience with cutting-edge technology and innovation showcases.',
-            'image_url' => '',
-            'gradient_theme' => 'from-gray-300 to-white',
-            'button_text' => 'Learn More',
-            'button_link' => ''
-        ],
-        [
-            'id' => 6,
-            'title' => 'Summer Festival',
-            'slug' => 'summer-festival-2024',
-            'event_type' => 'upcoming',
-            'badge_text' => 'Coming Soon',
-            'event_date_text' => 'July 2024',
-            'description' => 'A fusion of motor sport, music, fashion, and art in the ultimate summer celebration.',
-            'image_url' => '',
-            'gradient_theme' => 'from-white to-gray-300',
-            'button_text' => 'Learn More',
-            'button_link' => ''
-        ]
-    ];
 }
 ?>
 <!DOCTYPE html>

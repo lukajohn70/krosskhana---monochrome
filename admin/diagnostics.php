@@ -84,6 +84,49 @@ if (!$pdo) {
             echo "❌ Failed to create password_resets table: " . $ce->getMessage() . "\n";
         }
     }
+
+    // Check events table
+    try {
+        $stmt = $pdo->query("SELECT id, title, event_type, is_active FROM events ORDER BY sort_order ASC, id ASC");
+        $allEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo "✅ Table 'events' exists. Found " . count($allEvents) . " event(s) in database:\n";
+        foreach ($allEvents as $ev) {
+            $status = $ev['is_active'] ? 'ACTIVE' : 'HIDDEN';
+            echo "  - [ID {$ev['id']}] '{$ev['title']}' ({$ev['event_type']}, status: {$status})\n";
+        }
+    } catch (Exception $e) {
+        echo "⚠️ Table 'events' DOES NOT exist yet: " . $e->getMessage() . "\n";
+        echo "Attempting self-healing creation & initial seed...\n";
+        try {
+            $pdo->exec("
+            CREATE TABLE IF NOT EXISTS events (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                slug VARCHAR(255) NOT NULL,
+                event_type ENUM('past', 'upcoming') NOT NULL DEFAULT 'upcoming',
+                badge_text VARCHAR(100) DEFAULT NULL,
+                event_date_text VARCHAR(100) NOT NULL,
+                event_date DATE DEFAULT NULL,
+                description TEXT NOT NULL,
+                image_url VARCHAR(500) DEFAULT NULL,
+                gradient_theme VARCHAR(50) DEFAULT 'from-white to-gray-300',
+                button_text VARCHAR(100) DEFAULT 'View Details',
+                button_link VARCHAR(500) DEFAULT NULL,
+                sort_order INT DEFAULT 0,
+                is_active TINYINT(1) DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_event_type (event_type),
+                INDEX idx_is_active (is_active),
+                INDEX idx_sort_order (sort_order),
+                INDEX idx_event_date (event_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+            echo "✅ 'events' table created successfully!\n";
+        } catch (Exception $ee) {
+            echo "❌ Failed to create events table: " . $ee->getMessage() . "\n";
+        }
+    }
 }
 
 echo "\n--- 2. EMAIL CONFIGURATION CHECK ---\n";
